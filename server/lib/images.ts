@@ -53,8 +53,8 @@ export async function processSkinImage(buf: Buffer, declaredMime: string): Promi
   let optimized: Buffer, thumbnail: Buffer;
   try {
     [optimized, thumbnail] = await Promise.all([
-    base.clone().resize({ width: 1024, height: 1024, fit: "inside", withoutEnlargement: true }).webp({ quality: 84, alphaQuality: 90, effort: 4 }).toBuffer(),
-    base.clone().resize({ width: 320, height: 320, fit: "inside", withoutEnlargement: true }).webp({ quality: 76, alphaQuality: 85, effort: 4 }).toBuffer(),
+    base.clone().resize({ width: 1024, height: 1024, fit: "inside", withoutEnlargement: true }).webp({ quality: 84, alphaQuality: 90, effort: 2 }).toBuffer(),
+    base.clone().resize({ width: 320, height: 320, fit: "inside", withoutEnlargement: true }).webp({ quality: 76, alphaQuality: 85, effort: 2 }).toBuffer(),
     ]);
   } catch (err) {
     throw new ApiError("SERVER", `Image optimisation failed: ${(err as Error).message}`);
@@ -64,11 +64,12 @@ export async function processSkinImage(buf: Buffer, declaredMime: string): Promi
   const prefix = `skins/${id}`;
   let originalUrl: string, optimizedUrl: string, thumbnailUrl: string;
   try {
-    // Optimized first so the store's access mode is detected once before the others.
-    optimizedUrl = await putObject(`${prefix}/optimized.webp`, optimized, "image/webp");
-    [originalUrl, thumbnailUrl] = await Promise.all([
+    // The small thumbnail goes first so the store's access mode is detected cheaply (when
+    // BLOB_ACCESS isn't set); the larger files are then uploaded in parallel.
+    thumbnailUrl = await putObject(`${prefix}/thumb.webp`, thumbnail, "image/webp");
+    [optimizedUrl, originalUrl] = await Promise.all([
+      putObject(`${prefix}/optimized.webp`, optimized, "image/webp"),
       putObject(`${prefix}/original.${EXT[mime]}`, buf, mime),
-      putObject(`${prefix}/thumb.webp`, thumbnail, "image/webp"),
     ]);
   } catch (err) {
     if (err instanceof ApiError) throw err;

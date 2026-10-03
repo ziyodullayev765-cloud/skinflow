@@ -46,7 +46,33 @@ export async function adminRequest<T>(path: string, method = "GET", body?: unkno
   return handle<T>(res);
 }
 
-export async function uploadImage(file: File): Promise<UploadResult> {
+/**
+ * Large photos are downscaled in the browser before upload (max 2048px, WebP,
+ * transparency kept) so uploads stay fast and well under server limits.
+ */
+export async function prepareImage(file: File): Promise<File> {
+  const MAX_SIDE = 2048;
+  if (file.size < 1.2 * 1024 * 1024 || typeof createImageBitmap !== "function") return file;
+  try {
+    const bmp = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_SIDE / Math.max(bmp.width, bmp.height));
+    const w = Math.round(bmp.width * scale);
+    const h = Math.round(bmp.height * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    canvas.getContext("2d")!.drawImage(bmp, 0, 0, w, h);
+    bmp.close?.();
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/webp", 0.92));
+    if (!blob || blob.type !== "image/webp" || blob.size >= file.size) return file;
+    return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".webp", { type: "image/webp" });
+  } catch {
+    return file;
+  }
+}
+
+export async function uploadImage(original: File): Promise<UploadResult> {
+  const file = await prepareImage(original);
   let res: Response;
   try {
     res = await fetch("/api/admin/uploads", {
@@ -101,6 +127,7 @@ export interface AdminSkin {
   featured: boolean;
   createdAt: string;
   owners?: number;
+  caseIds?: number[];
 }
 
 export interface Paged<T> {

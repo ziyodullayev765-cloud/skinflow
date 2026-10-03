@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./api";
-import type { CollectionInfo, GameCase, InventoryItem, Me, Mission, OpenResult, Opening, Profile } from "./types";
+import type { CollectionInfo, GameCase, InventoryItem, Me, Mission, OpenResult, Opening, Profile, Skin } from "./types";
 
 export const qk = {
   me: ["me"] as const,
@@ -20,18 +20,24 @@ export const useCases = () =>
   useQuery({
     queryKey: qk.cases,
     queryFn: ({ signal }) => api.get<{ cases: GameCase[]; casesEnabled: boolean }>("/api/cases", signal),
-    staleTime: 60_000,
+    refetchOnMount: "always",
   });
 
 export const useCase = (id: number) => {
   const qc = useQueryClient();
-  return useQuery({
+  return useQuery<GameCase>({
     queryKey: qk.case(id),
     queryFn: ({ signal }) => api.get<{ case: GameCase }>(`/api/cases/${id}`, signal).then((r) => r.case),
-    initialData: () => qc.getQueryData<{ cases: GameCase[] }>(qk.cases)?.cases.find((c) => c.id === id),
-    staleTime: 60_000,
+    placeholderData: () => qc.getQueryData<{ cases: GameCase[] }>(qk.cases)?.cases.find((c) => c.id === id),
+    refetchOnMount: "always",
   });
 };
+
+export const useFeatured = () =>
+  useQuery({
+    queryKey: ["featured"],
+    queryFn: ({ signal }) => api.get<{ skins: (Skin & { caseId: number | null; caseName: string | null })[] }>("/api/featured", signal).then((r) => r.skins),
+  });
 
 export const useInventory = () =>
   useQuery({ queryKey: qk.inventory, queryFn: ({ signal }) => api.get<{ items: InventoryItem[] }>("/api/inventory", signal).then((r) => r.items) });

@@ -3,7 +3,7 @@ import { useRef, useState, type DragEvent } from "react";
 import { Icon } from "../../components/Icon";
 import { Spinner } from "../../components/ui";
 
-export const MAX_IMAGE_MB = 4;
+export const MAX_IMAGE_MB = 15; // large photos are downscaled in the browser before upload
 const ACCEPT = ["image/png", "image/jpeg", "image/webp"];
 
 /** Drag & drop / click-to-pick image input with client-side type + size checks and instant preview. */

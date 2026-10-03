@@ -12,9 +12,10 @@ initTelegram();
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 15_000,
+      staleTime: 5_000,
       gcTime: 10 * 60_000,
-      refetchOnWindowFocus: false,
+      // Admin changes (prices, images, cases) should show up as soon as players return.
+      refetchOnWindowFocus: true,
       retry: (count, err) => {
         if (err instanceof ApiError && !["NETWORK", "SERVER"].includes(err.code)) return false;
         return count < 2;
@@ -23,6 +24,13 @@ const queryClient = new QueryClient({
     mutations: { retry: false },
   },
 });
+
+// Telegram keeps Mini Apps alive in the background: refresh data when the user comes back.
+try {
+  window.Telegram?.WebApp?.onEvent?.("activated", () => void queryClient.invalidateQueries());
+} catch {
+  /* not in Telegram */
+}
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
   window.addEventListener("load", () => {

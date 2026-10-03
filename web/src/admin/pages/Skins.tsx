@@ -108,6 +108,7 @@ interface FormState {
   featured: boolean;
   uploadId: string | null;
   preview: string | null;
+  caseIds: number[];
 }
 
 const EMPTY: FormState = {
@@ -123,6 +124,7 @@ const EMPTY: FormState = {
   featured: false,
   uploadId: null,
   preview: null,
+  caseIds: [],
 };
 
 /** Client-side mirror of server validation (server remains the source of truth). */
@@ -169,7 +171,14 @@ function Preview({ f }: { f: FormState }) {
   );
 }
 
-function SkinForm({ editing, collections, onSaved }: { editing: AdminSkin | null; collections: Collection[]; onSaved: (s: AdminSkin, created: boolean) => void }) {
+interface CaseOption {
+  id: number;
+  name: string;
+  image: string;
+  active: boolean;
+}
+
+function SkinForm({ editing, collections, cases, onSaved }: { editing: AdminSkin | null; collections: Collection[]; cases: CaseOption[]; onSaved: (s: AdminSkin, created: boolean) => void }) {
   const [f, setF] = useState<FormState>(EMPTY);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverErr, setServerErr] = useState<string | null>(null);
@@ -198,6 +207,7 @@ function SkinForm({ editing, collections, onSaved }: { editing: AdminSkin | null
             featured: editing.featured,
             uploadId: null,
             preview: editing.image,
+            caseIds: editing.caseIds ?? [],
           }
         : EMPTY,
     );
@@ -258,6 +268,7 @@ function SkinForm({ editing, collections, onSaved }: { editing: AdminSkin | null
       uploadId: f.uploadId ?? undefined,
       active: f.active,
       featured: f.featured,
+      caseIds: f.caseIds,
     };
     try {
       const r = editing ? await adminApi.put<{ skin: AdminSkin }>(`/skins/${editing.id}`, body) : await adminApi.post<{ skin: AdminSkin }>("/skins", body);
@@ -343,6 +354,33 @@ function SkinForm({ editing, collections, onSaved }: { editing: AdminSkin | null
         <Field field="description" label={`Tavsif (${f.description.length}/500)`} error={errors.description}>
           <Textarea value={f.description} onChange={(e) => set({ description: e.target.value })} maxLength={500} placeholder="Skin haqida qisqacha tavsif." />
         </Field>
+        <div data-field="caseIds">
+          <p className="mb-1.5 text-xs font-medium text-muted">Qaysi keyslardan tushadi</p>
+          <div className="flex flex-wrap gap-2">
+            {cases.map((c) => {
+              const on = f.caseIds.includes(c.id);
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => set({ caseIds: on ? f.caseIds.filter((x) => x !== c.id) : [...f.caseIds, c.id] })}
+                  className="chip"
+                >
+                  <img src={c.image} alt="" className="h-5 w-5 object-contain" />
+                  {c.name}
+                  {!c.active && <span className="text-[10px] opacity-60">(o'chirilgan)</span>}
+                  {on && <Icon name="check" size={13} />}
+                </button>
+              );
+            })}
+          </div>
+          <p className={clsx("mt-1.5 text-xs", f.caseIds.length ? "text-muted" : "text-coin")}>
+            {f.caseIds.length
+              ? "Tushish ehtimolini Keyslar bo'limida aniq sozlashingiz mumkin."
+              : "Diqqat: skin hech qaysi keysga qo'shilmagan — o'yinchilar uni ololmaydi."}
+          </p>
+        </div>
         <div className="flex flex-wrap gap-6">
           <div>
             <p className="mb-1.5 text-xs font-medium text-muted">Holat</p>
@@ -396,10 +434,14 @@ export default function Skins({ me }: { me: AdminMe }) {
 
   const skins = useQuery({ queryKey: ["admin", "skins", params], queryFn: () => adminApi.get<Paged<AdminSkin>>(`/skins?${params}`), placeholderData: (p) => p });
   const collections = useQuery({ queryKey: ["admin", "collections"], queryFn: () => adminApi.get<{ rows: Collection[] }>("/collections").then((r) => r.rows) });
+  const caseList = useQuery({ queryKey: ["admin", "cases"], queryFn: () => adminApi.get<{ rows: CaseOption[] }>("/cases").then((r) => r.rows) });
+  const caseName = (id: number) => caseList.data?.find((c) => c.id === id)?.name ?? `#${id}`;
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["admin", "skins"] });
     void qc.invalidateQueries({ queryKey: ["admin", "collections"] });
+    void qc.invalidateQueries({ queryKey: ["admin", "cases"] });
+    void qc.invalidateQueries({ queryKey: ["admin", "weapon-names"] });
   };
   const flash = (tone: "info" | "error", text: string) => {
     setNotice({ tone, text });
@@ -438,6 +480,19 @@ export default function Skins({ me }: { me: AdminMe }) {
     { key: "rarity", header: "Noyoblik", render: (s) => <RarityPill rarity={s.rarity} /> },
     { key: "price", header: "Virtual narx", render: (s) => <span className="inline-flex items-center gap-1 tabular-nums"><CoinIcon size={12} />{fmt(s.virtualPrice)}</span> },
     { key: "collection", header: "Kolleksiya", render: (s) => <span className="text-muted">{s.collection}</span>, hideOnMobile: true },
+    {
+      key: "cases",
+      header: "Keyslar",
+      render: (s) =>
+        s.caseIds && s.caseIds.length ? (
+          <span className="text-xs text-muted" title={s.caseIds.map((id) => caseName(id)).join(", ")}>
+            {s.caseIds.length} ta
+          </span>
+        ) : (
+          <span className="text-xs text-coin" title="Hech qaysi keysda yo'q — o'yinchilar ololmaydi">yo'q</span>
+        ),
+      hideOnMobile: true,
+    },
     { key: "status", header: "Holat", render: (s) => <StatusPill active={s.active} /> },
     { key: "featured", header: "Tanlangan", render: (s) => (s.featured ? <span className="text-coin">★ Ha</span> : <span className="text-muted">Yo'q</span>), hideOnMobile: true },
     { key: "created", header: "Yaratilgan", render: (s) => <span className="whitespace-nowrap text-xs text-muted">{shortDate(s.createdAt)}</span>, hideOnMobile: true },
@@ -520,6 +575,7 @@ export default function Skins({ me }: { me: AdminMe }) {
         <SkinForm
           editing={editing}
           collections={collections.data ?? []}
+          cases={caseList.data ?? []}
           onSaved={(s, created) => {
             refresh();
             setHighlight(s.id);

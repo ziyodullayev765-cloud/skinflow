@@ -175,8 +175,31 @@ const skinBody = z
     uploadId: z.string().regex(/^[a-f0-9]{20}$/).optional(),
     active: z.boolean().default(true),
     featured: z.boolean().default(false),
+    /** Cases this skin drops from. Omit to leave case membership unchanged. */
+    caseIds: z.array(idParam).max(100).optional(),
   })
   .strict();
+
+/** Default drop weight for a skin newly added to a case (admins can fine-tune per case). */
+const DEFAULT_WEIGHT_BY_RARITY: Record<string, number> = { common: 1000, uncommon: 500, rare: 250, epic: 80, legendary: 25 };
+
+/** Makes the skin drop from exactly `caseIds`, keeping existing weights for cases it was already in. */
+async function syncSkinCases(client: Queryable, skinId: number, rarity: string, caseIds: number[] | undefined) {
+  if (!caseIds) return;
+  const ids = [...new Set(caseIds)];
+  if (ids.length) {
+    const found = await query(`SELECT id FROM cases WHERE id = ANY($1)`, [ids], client);
+    if (found.length !== ids.length) throw new ApiError("VALIDATION", "One or more cases do not exist", [{ path: "caseIds", message: "Case not found" }]);
+  }
+  await query(`DELETE FROM case_items WHERE skin_id = $1 AND NOT (case_id = ANY($2::int[]))`, [skinId, ids], client);
+  for (const caseId of ids) {
+    await query(`INSERT INTO case_items (case_id, skin_id, weight) VALUES ($1, $2, $3) ON CONFLICT (case_id, skin_id) DO NOTHING`, [
+      caseId,
+      skinId,
+      DEFAULT_WEIGHT_BY_RARITY[rarity] ?? 100,
+    ], client);
+  }
+}
 
 type SkinBody = z.infer<typeof skinBody>;
 
@@ -208,12 +231,14 @@ async function resolveUpload(client: Queryable, uploadId: string) {
 }
 
 async function loadSkin(id: number, client: Queryable = getPool()) {
-  const r = await query<SkinRow & { owners: number }>(
-    `SELECT ${SKIN_COLUMNS}, (SELECT count(*)::int FROM inventory i WHERE i.skin_id = s.id) AS owners FROM skins s WHERE s.id = $1`,
+  const r = await query<SkinRow & { owners: number; case_ids: number[] }>(
+    `SELECT ${SKIN_COLUMNS}, (SELECT count(*)::int FROM inventory i WHERE i.skin_id = s.id AND i.quantity > 0) AS owners,
+            COALESCE((SELECT array_agg(ci.case_id ORDER BY ci.case_id) FROM case_items ci WHERE ci.skin_id = s.id), '{}') AS case_ids
+       FROM skins s WHERE s.id = $1`,
     [id],
     client,
   );
-  return r[0] ? { ...serializeSkin(r[0]), owners: r[0].owners } : null;
+  return r[0] ? { ...serializeSkin(r[0]), owners: r[0].owners, caseIds: r[0].case_ids } : null;
 }
 
 adminRouter.get("/skins", async (req, res) => {
@@ -241,12 +266,14 @@ adminRouter.get("/skins", async (req, res) => {
   const limit = p.all ? 1000 : p.pageSize;
   const offset = p.all ? 0 : (p.page - 1) * p.pageSize;
   params.push(limit, offset);
-  const rows = await query<SkinRow & { total_count: number; owners: number }>(
-    `SELECT ${SKIN_COLUMNS}, (SELECT count(*)::int FROM inventory i WHERE i.skin_id = s.id) AS owners, count(*) OVER()::int AS total_count
+  const rows = await query<SkinRow & { total_count: number; owners: number; case_ids: number[] }>(
+    `SELECT ${SKIN_COLUMNS}, (SELECT count(*)::int FROM inventory i WHERE i.skin_id = s.id AND i.quantity > 0) AS owners,
+            COALESCE((SELECT array_agg(ci.case_id ORDER BY ci.case_id) FROM case_items ci WHERE ci.skin_id = s.id), '{}') AS case_ids,
+            count(*) OVER()::int AS total_count
        FROM skins s ${where} ORDER BY s.id DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params,
   );
-  res.json({ rows: rows.map((r) => ({ ...serializeSkin(r), owners: r.owners })), total: rows[0]?.total_count ?? 0, page: p.page, pageSize: p.pageSize });
+  res.json({ rows: rows.map((r) => ({ ...serializeSkin(r), owners: r.owners, caseIds: r.case_ids })), total: rows[0]?.total_count ?? 0, page: p.page, pageSize: p.pageSize });
 });
 
 /** Distinct weapon names with skin counts (for the bulk rename tool). */
@@ -288,6 +315,7 @@ adminRouter.post("/skins", requireRole("admin"), async (req, res) => {
       [skinSlug(b.name, b.weaponType), b.name, b.weaponName || WEAPON_DEFAULT_NAME[b.weaponType], b.weaponType, b.rarity, img.original_url, img.optimized_url, img.thumbnail_url, b.description, b.virtualPrice, collectionId, b.active, b.featured],
       client,
     );
+    await syncSkinCases(client, r[0].id, b.rarity, b.caseIds);
     return r[0].id;
   });
   await auditLog(req, "skin.create", "skin", id, { name: b.name, rarity: b.rarity, virtualPrice: b.virtualPrice });
@@ -311,8 +339,9 @@ adminRouter.put("/skins/:id", requireRole("admin"), async (req, res) => {
         img?.original_url ?? null, img?.optimized_url ?? null, img?.thumbnail_url ?? null],
       client,
     );
+    await syncSkinCases(client, id, b.rarity, b.caseIds);
   });
-  await auditLog(req, "skin.update", "skin", id, { name: b.name, rarity: b.rarity, virtualPrice: b.virtualPrice, active: b.active, featured: b.featured, imageChanged: !!b.uploadId });
+  await auditLog(req, "skin.update", "skin", id, { name: b.name, rarity: b.rarity, virtualPrice: b.virtualPrice, active: b.active, featured: b.featured, imageChanged: !!b.uploadId, caseIds: b.caseIds });
   res.json({ skin: await loadSkin(id) });
 });
 

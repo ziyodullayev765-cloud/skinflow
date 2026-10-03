@@ -36,6 +36,10 @@ function useApplyPreferences() {
   }, [darkTheme]);
   useEffect(() => setHapticsEnabled(haptics), [haptics]);
   const intensity = useSession((x) => x.config?.animationIntensity);
+  const appName = useSession((x) => x.config?.appName);
+  useEffect(() => {
+    if (appName) document.title = appName;
+  }, [appName]);
   useEffect(() => {
     document.documentElement.classList.toggle("reduce-motion", reduced);
     document.documentElement.classList.toggle("anim-low", intensity === "low");
@@ -107,7 +111,7 @@ function Gate() {
         <div className="pointer-events-none absolute -top-40 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-accent/20 blur-3xl" />
         <div className="relative w-full max-w-sm text-center">
           <img src="/assets/icons/app.svg" alt="" className="mx-auto mb-6 h-16 w-16" />
-          <h1 className="font-display text-2xl font-bold tracking-tight">{t("auth.welcome")}</h1>
+          <h1 className="font-display text-2xl font-bold tracking-tight">{config?.appName && config.appName !== "SkinFlow" ? config.appName : t("auth.welcome")}</h1>
           <p className="mt-2 text-sm text-muted">{t("auth.body")}</p>
           <div className="mt-8 flex flex-col gap-3">
             {config?.botUsername && (

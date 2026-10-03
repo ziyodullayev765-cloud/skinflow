@@ -114,7 +114,7 @@ describe("inventory filtering and sorting", () => {
 });
 
 describe("admin skin form validation", () => {
-  const ok = { name: "Carbon Pulse", weaponType: "rifle", weaponName: "", rarity: "rare" as const, virtualPrice: "1000", description: "", collectionId: "", newCollection: "", active: true, featured: false, uploadId: "abc", preview: null };
+  const ok = { name: "Carbon Pulse", weaponType: "rifle", weaponName: "", rarity: "rare" as const, virtualPrice: "1000", description: "", collectionId: "", newCollection: "", active: true, featured: false, uploadId: "abc", preview: null, caseIds: [] as number[] };
   it("accepts a valid form", () => {
     expect(Object.values(validateSkinForm(ok, true)).filter(Boolean)).toHaveLength(0);
   });

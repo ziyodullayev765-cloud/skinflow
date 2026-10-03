@@ -10,7 +10,7 @@ import { BalancePill, Page } from "../components/TopBar";
 import { Avatar, CoinIcon, ProgressBar, SectionHeader, Skeleton } from "../components/ui";
 import { fmt, timeAgo } from "../lib/format";
 import { useT } from "../lib/i18n";
-import { useCases, useInventory, useMe, useMissions, useOpenings, useProfile } from "../lib/queries";
+import { useCases, useFeatured, useInventory, useMe, useMissions, useOpenings, useProfile } from "../lib/queries";
 import { haptic } from "../lib/telegram";
 
 function Greeting() {
@@ -90,6 +90,45 @@ function Hero() {
             </span>
           )}
         </div>
+      </div>
+    </section>
+  );
+}
+
+function FeaturedSkins() {
+  const t = useT();
+  const navigate = useNavigate();
+  const featured = useFeatured();
+  const skins = featured.data ?? [];
+  if (!featured.isLoading && skins.length === 0) return null;
+  return (
+    <section>
+      <SectionHeader title={t("home.featuredSkins")} />
+      <div className="no-scrollbar -mx-4 flex gap-2.5 overflow-x-auto px-4 pb-1">
+        {featured.isLoading
+          ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-[150px] w-[168px] shrink-0 rounded-2xl" />)
+          : skins.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => navigate(s.caseId ? `/cases/${s.caseId}` : "/cases")}
+                className={`rarity-${s.rarity} card relative w-[168px] shrink-0 overflow-hidden p-2.5 text-left`}
+              >
+                <div className="rarity-glow absolute inset-0" />
+                <div className="shine-sweep" />
+                <SkinImage src={s.thumbnail} alt="" className="relative h-[72px]" />
+                <div className="rarity-bar my-2 h-px" />
+                <p className="relative truncate text-[10.5px] uppercase tracking-wider text-muted">{s.weaponName}</p>
+                <p className="relative truncate text-[13px] font-semibold">{s.name}</p>
+                <p className="relative mt-1 flex items-center justify-between text-[11px] text-muted">
+                  <span className="inline-flex items-center gap-1 tabular-nums">
+                    <CoinIcon size={11} />
+                    {fmt(s.virtualPrice)}
+                  </span>
+                  {s.caseName && <span className="truncate pl-2">{s.caseName}</span>}
+                </p>
+              </button>
+            ))}
       </div>
     </section>
   );
@@ -237,6 +276,7 @@ export default function Home() {
       <Page className="space-y-6">
         <Hero />
         <DailyReward />
+        <FeaturedSkins />
         <RecentDrops />
         <div className="grid gap-6 lg:grid-cols-2">
           <CollectionProgress />

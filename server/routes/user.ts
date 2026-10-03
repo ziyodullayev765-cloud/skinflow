@@ -71,6 +71,19 @@ userRouter.get("/cases", async (_req, res) => {
   res.json({ cases: await loadCases(), casesEnabled: settings.cases_enabled });
 });
 
+/** Skins the admin marked as featured, with a case they can be opened from. */
+userRouter.get("/featured", async (_req, res) => {
+  const rows = await query<SkinRow & { case_id: number | null; case_name: string | null }>(
+    `SELECT ${SKIN_COLUMNS}, fc.case_id, fc.case_name FROM skins s
+       LEFT JOIN LATERAL (
+         SELECT c.id AS case_id, c.name AS case_name FROM case_items ci JOIN cases c ON c.id = ci.case_id
+          WHERE ci.skin_id = s.id AND c.active ORDER BY c.cost, c.id LIMIT 1
+       ) fc ON TRUE
+      WHERE s.active AND s.featured ORDER BY s.virtual_price DESC LIMIT 12`,
+  );
+  res.json({ skins: rows.map((r) => ({ ...serializeSkin(r), caseId: r.case_id, caseName: r.case_name })) });
+});
+
 userRouter.get("/cases/:id", async (req, res) => {
   const id = parse(idParam, req.params.id);
   const [c] = await loadCases(id);

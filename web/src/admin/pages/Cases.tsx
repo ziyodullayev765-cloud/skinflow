@@ -344,7 +344,10 @@ export default function Cases({ me }: { me: AdminMe }) {
             key={String(editing)}
             id={editing === "new" ? null : editing}
             canEdit={canEdit}
-            onSaved={() => void qc.invalidateQueries({ queryKey: ["admin", "cases"] })}
+            onSaved={() => {
+              void qc.invalidateQueries({ queryKey: ["admin", "cases"] });
+              void qc.invalidateQueries({ queryKey: ["admin", "skins"] });
+            }}
           />
         )}
       </Sheet>

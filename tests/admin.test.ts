@@ -195,6 +195,45 @@ describe("skin management", () => {
     expect(chk.d).toContain("1000000000");
   });
 
+  it("assigns skins to cases from the skin form and players see the change immediately", async () => {
+    const { agent, csrf } = await adminAgent();
+    const up = (await upload(agent, csrf)).body.upload;
+    const cases = await query(`SELECT id FROM cases WHERE active ORDER BY id LIMIT 2`);
+    const created = await agent
+      .post("/api/admin/skins")
+      .set("X-CSRF-Token", csrf)
+      .send({ name: "Linked Skin", weaponType: "rifle", rarity: "epic", virtualPrice: 4321, uploadId: up.id, caseIds: [cases[0].id, cases[1].id], featured: true })
+      .expect(201);
+    const id = created.body.skin.id;
+    expect(created.body.skin.caseIds).toEqual([cases[0].id, cases[1].id]);
+    const w = await queryOne(`SELECT weight FROM case_items WHERE case_id = $1 AND skin_id = $2`, [cases[0].id, id]);
+    expect(w.weight).toBe(80); // default epic weight
+
+    // Player sees it in the case contents and in featured skins.
+    const g = await guest();
+    const c = await request(app).get(`/api/cases/${cases[0].id}`).set(...g.auth).expect(200);
+    expect(c.body.case.items.find((i: { id: number }) => i.id === id).virtualPrice).toBe(4321);
+    const f = await request(app).get("/api/featured").set(...g.auth).expect(200);
+    expect(f.body.skins.find((s: { id: number }) => s.id === id).caseId).toBe(cases[0].id);
+
+    // Custom weight survives an edit; removing a case removes the item; price change is visible to players.
+    await query(`UPDATE case_items SET weight = 7 WHERE case_id = $1 AND skin_id = $2`, [cases[0].id, id]);
+    await agent
+      .put(`/api/admin/skins/${id}`)
+      .set("X-CSRF-Token", csrf)
+      .send({ name: "Linked Skin", weaponType: "rifle", rarity: "epic", virtualPrice: 999_000_000, caseIds: [cases[0].id], active: true, featured: true })
+      .expect(200);
+    expect((await queryOne(`SELECT weight FROM case_items WHERE case_id = $1 AND skin_id = $2`, [cases[0].id, id])).weight).toBe(7);
+    expect(await queryOne(`SELECT 1 FROM case_items WHERE case_id = $1 AND skin_id = $2`, [cases[1].id, id])).toBeNull();
+    const c2 = await request(app).get(`/api/cases/${cases[0].id}`).set(...g.auth).expect(200);
+    expect(c2.body.case.items.find((i: { id: number }) => i.id === id).virtualPrice).toBe(999_000_000);
+
+    // Omitting caseIds leaves membership untouched; unknown case ids are rejected.
+    await agent.put(`/api/admin/skins/${id}`).set("X-CSRF-Token", csrf).send({ name: "Linked Skin", weaponType: "rifle", rarity: "epic", virtualPrice: 5, active: true }).expect(200);
+    expect(await queryOne(`SELECT 1 FROM case_items WHERE case_id = $1 AND skin_id = $2`, [cases[0].id, id])).toBeTruthy();
+    await agent.put(`/api/admin/skins/${id}`).set("X-CSRF-Token", csrf).send({ name: "Linked Skin", weaponType: "rifle", rarity: "epic", virtualPrice: 5, caseIds: [999999] }).expect(400);
+  });
+
   it("refuses to hard-delete skins that players own", async () => {
     const { agent, csrf } = await adminAgent();
     const g = await guest();
