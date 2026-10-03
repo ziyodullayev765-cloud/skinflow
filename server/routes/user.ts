@@ -138,6 +138,43 @@ userRouter.post("/inventory/:skinId/favorite", async (req, res) => {
   res.json({ favorite: result.favorite });
 });
 
+/**
+ * Sells owned copies back for VIRTUAL coins at the skin's virtual price.
+ * Coins stay inside the app — there is no purchase, withdrawal or cash-out path.
+ * Price and quantity are always taken from the database, never from the client.
+ */
+userRouter.post("/inventory/:skinId/sell", rateLimit("sell", 60, 60, userKey), async (req, res) => {
+  const skinId = parse(idParam, req.params.skinId);
+  const body = parse(z.object({ quantity: z.number().int().min(1).max(10_000).default(1) }), req.body ?? {});
+  const out = await withTransaction(async (client) => {
+    const row = (
+      await query<{ id: number; quantity: number; favorite: boolean; virtual_price: number }>(
+        `SELECT i.id, i.quantity, i.favorite, s.virtual_price FROM inventory i JOIN skins s ON s.id = i.skin_id
+          WHERE i.user_id = $1 AND i.skin_id = $2 FOR UPDATE OF i`,
+        [req.user!.id, skinId],
+        client,
+      )
+    )[0];
+    if (!row || row.quantity <= 0) throw new ApiError("NOT_FOUND", "This skin is not in your collection.");
+    if (body.quantity > row.quantity) throw new ApiError("VALIDATION", `You only own ${row.quantity}.`);
+    const total = row.virtual_price * body.quantity;
+    const left = row.quantity - body.quantity;
+    await query(
+      `UPDATE inventory SET quantity = $2, favorite = CASE WHEN $2 = 0 THEN FALSE ELSE favorite END, updated_at = now() WHERE id = $1`,
+      [row.id, left],
+      client,
+    );
+    const u = (await query<{ virtual_coins: number }>(
+      `UPDATE users SET virtual_coins = virtual_coins + $2, updated_at = now() WHERE id = $1 RETURNING virtual_coins`,
+      [req.user!.id, total],
+      client,
+    ))[0];
+    await query(`INSERT INTO sales (user_id, skin_id, quantity, unit_price, total) VALUES ($1,$2,$3,$4,$5)`, [req.user!.id, skinId, body.quantity, row.virtual_price, total], client);
+    return { sold: body.quantity, earned: total, remaining: left, balance: u.virtual_coins };
+  });
+  res.json(out);
+});
+
 // ---------- Collections ----------
 userRouter.get("/collections", async (req, res) => {
   const rows = await query<SkinRow & { quantity: number | null }>(
@@ -185,6 +222,38 @@ userRouter.get("/missions", async (req, res) => {
 userRouter.post("/missions/:id/claim", rateLimit("claim", 30, 60, userKey), async (req, res) => {
   const id = parse(idParam, req.params.id);
   res.json(await claimMission(req.user!.id, id));
+});
+
+// ---------- Promo codes ----------
+userRouter.post("/promo/redeem", rateLimit("promo", 10, 60, userKey), async (req, res) => {
+  const { code } = parse(z.object({ code: z.string().trim().toUpperCase().regex(/^[A-Z0-9_-]{3,32}$/, "Invalid code") }), req.body);
+  const out = await withTransaction(async (client) => {
+    const promo = (
+      await query<{ id: number; reward: number; max_uses: number | null; uses: number; active: boolean; expired: boolean }>(
+        `SELECT id, reward, max_uses, uses, active, (expires_at IS NOT NULL AND expires_at < now()) AS expired
+           FROM promo_codes WHERE code = $1 FOR UPDATE`,
+        [code],
+        client,
+      )
+    )[0];
+    if (!promo || !promo.active) throw new ApiError("NOT_FOUND", "Promo code not found.");
+    if (promo.expired) throw new ApiError("NOT_FOUND", "This promo code has expired.");
+    if (promo.max_uses !== null && promo.uses >= promo.max_uses) throw new ApiError("ALREADY_CLAIMED", "This promo code has been fully used.");
+    const ins = await query(
+      `INSERT INTO promo_redemptions (promo_id, user_id, reward) VALUES ($1,$2,$3) ON CONFLICT (promo_id, user_id) DO NOTHING RETURNING id`,
+      [promo.id, req.user!.id, promo.reward],
+      client,
+    );
+    if (!ins.length) throw new ApiError("ALREADY_CLAIMED", "You have already used this promo code.");
+    await query(`UPDATE promo_codes SET uses = uses + 1 WHERE id = $1`, [promo.id], client);
+    const u = (await query<{ virtual_coins: number }>(
+      `UPDATE users SET virtual_coins = virtual_coins + $2, updated_at = now() WHERE id = $1 RETURNING virtual_coins`,
+      [req.user!.id, promo.reward],
+      client,
+    ))[0];
+    return { reward: promo.reward, balance: u.virtual_coins };
+  });
+  res.json(out);
 });
 
 // ---------- Daily reward ----------

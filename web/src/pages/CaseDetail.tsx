@@ -40,7 +40,7 @@ export default function CaseDetail() {
   if (kase.isLoading)
     return (
       <>
-        <TopBar back title="" />
+        <TopBar back onBack={() => navigate("/cases")} title="" />
         <Page>
           <Skeleton className="mx-auto aspect-square w-2/3 rounded-3xl" />
           <Skeleton className="mt-6 h-12 w-full rounded-xl" />
@@ -55,14 +55,14 @@ export default function CaseDetail() {
   if (kase.isError || !c)
     return (
       <>
-        <TopBar back title={t("cases.title")} />
+        <TopBar back onBack={() => navigate("/cases")} title={t("cases.title")} />
         <ErrorState error={kase.error} onRetry={() => void kase.refetch()} />
       </>
     );
 
   return (
     <>
-      <TopBar back title={c.name} subtitle={t("cases.items", { count: c.itemCount })} />
+      <TopBar back onBack={() => navigate("/cases")} title={c.name} subtitle={t("cases.items", { count: c.itemCount })} />
       <Page wide className="pb-28">
         <div className="lg:grid lg:grid-cols-[minmax(0,420px)_1fr] lg:gap-10">
           <section className="relative">

@@ -66,16 +66,20 @@ export function StatCard({ label, value, icon, tone = "accent", loading }: { lab
   );
 }
 
+export const RARITY_UZ: Record<Rarity, string> = { common: "Oddiy", uncommon: "Noodatiy", rare: "Noyob", epic: "Epik", legendary: "Afsonaviy" };
+export const ROLE_UZ: Record<string, string> = { owner: "Egasi", admin: "Admin", viewer: "Kuzatuvchi" };
+export const PERIOD_UZ: Record<string, string> = { daily: "Kunlik", weekly: "Haftalik", once: "Bir martalik" };
+
 export function RarityPill({ rarity }: { rarity: Rarity }) {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize" style={{ color: RARITY_HEX[rarity], background: `${RARITY_HEX[rarity]}1f` }}>
       <span className="h-1.5 w-1.5 rounded-full" style={{ background: RARITY_HEX[rarity] }} />
-      {rarity}
+      {RARITY_UZ[rarity] ?? rarity}
     </span>
   );
 }
 
-export function StatusPill({ active, on = "Active", off = "Inactive" }: { active: boolean; on?: string; off?: string }) {
+export function StatusPill({ active, on = "Faol", off = "Nofaol" }: { active: boolean; on?: string; off?: string }) {
   return (
     <span className={clsx("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold", active ? "bg-success/12 text-success" : "bg-white/5 text-muted")}>
       <span className={clsx("h-1.5 w-1.5 rounded-full", active ? "bg-success" : "bg-muted")} />

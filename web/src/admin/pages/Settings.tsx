@@ -5,7 +5,7 @@ import { Spinner } from "../../components/ui";
 import { ApiError } from "../../lib/api";
 import type { AdminMe } from "../AdminApp";
 import { adminApi } from "../api";
-import { Field, Input, Notice, PageHeader, Segmented, Select } from "../components/kit";
+import { Field, Input, Notice, PageHeader, ROLE_UZ, Segmented, Select } from "../components/kit";
 
 interface AppSettings {
   app_name: string;
@@ -45,21 +45,21 @@ function TelegramSection() {
   const [result, setResult] = useState<{ origin: string; results: Record<string, { configured: boolean; username?: string; error?: string }> } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   return (
-    <Section title="Telegram bots" subtitle="Player bot opens the game; admin bot opens this panel as a Mini App.">
+    <Section title="Telegram botlar" subtitle="O'yinchi boti o'yinni, admin boti esa shu panelni Mini App sifatida ochadi.">
       {q.data && (
         <ul className="mb-4 space-y-1.5 text-sm">
-          <li className="flex items-center gap-2"><Icon name={q.data.appBotConfigured ? "check" : "close"} size={16} className={q.data.appBotConfigured ? "text-success" : "text-danger"} /> Player bot token {q.data.appBotConfigured ? "configured" : "missing (TELEGRAM_BOT_TOKEN)"}</li>
-          <li className="flex items-center gap-2"><Icon name={q.data.adminBotConfigured ? "check" : "close"} size={16} className={q.data.adminBotConfigured ? "text-success" : "text-danger"} /> Admin bot token {q.data.adminBotConfigured ? "configured" : "missing (ADMIN_TELEGRAM_BOT_TOKEN)"}</li>
-          <li className="text-xs text-muted">Allowed admin Telegram IDs (env): {q.data.allowedIds.length ? q.data.allowedIds.join(", ") : "none"} · Linked: {q.data.linked.map((l) => `${l.username} (${l.telegram_id})`).join(", ") || "none"}</li>
+          <li className="flex items-center gap-2"><Icon name={q.data.appBotConfigured ? "check" : "close"} size={16} className={q.data.appBotConfigured ? "text-success" : "text-danger"} /> O'yinchi boti tokeni {q.data.appBotConfigured ? "sozlangan" : "yo'q (TELEGRAM_BOT_TOKEN)"}</li>
+          <li className="flex items-center gap-2"><Icon name={q.data.adminBotConfigured ? "check" : "close"} size={16} className={q.data.adminBotConfigured ? "text-success" : "text-danger"} /> Admin boti tokeni {q.data.adminBotConfigured ? "sozlangan" : "yo'q (ADMIN_TELEGRAM_BOT_TOKEN)"}</li>
+          <li className="text-xs text-muted">Ruxsat etilgan admin Telegram ID'lari: {q.data.allowedIds.length ? q.data.allowedIds.join(", ") : "yo'q"} · Bog'langan: {q.data.linked.map((l) => `${l.username} (${l.telegram_id})`).join(", ") || "yo'q"}</li>
         </ul>
       )}
       {err && <div className="mb-3"><Notice tone="error">{err}</Notice></div>}
       {result && (
         <div className="mb-3 space-y-1 rounded-xl bg-surface2 p-3 text-xs">
-          <p className="text-muted">Mini App URL: {result.origin}</p>
+          <p className="text-muted">Mini App manzili: {result.origin}</p>
           {Object.entries(result.results).map(([k, v]) => (
             <p key={k}>
-              <b className="capitalize">{k} bot:</b> {!v.configured ? "not configured" : v.error ? <span className="text-danger">{v.error}</span> : <span className="text-success">@{v.username} — webhook, menu button & commands set ✓</span>}
+              <b className="capitalize">{k} bot:</b> {!v.configured ? "sozlanmagan" : v.error ? <span className="text-danger">{v.error}</span> : <span className="text-success">@{v.username} — webhook, menyu tugmasi va buyruqlar sozlandi ✓</span>}
             </p>
           ))}
         </div>
@@ -75,13 +75,13 @@ function TelegramSection() {
             setResult(await adminApi.post("/telegram/setup"));
             void qc.invalidateQueries({ queryKey: ["admin", "telegram"] });
           } catch (e) {
-            setErr(e instanceof ApiError ? e.message : "Setup failed");
+            setErr(e instanceof ApiError ? e.message : "Sozlash bajarilmadi");
           } finally {
             setBusy(false);
           }
         }}
       >
-        {busy ? <Spinner /> : <Icon name="telegram" size={18} />} Connect bots to this deployment
+        {busy ? <Spinner /> : <Icon name="telegram" size={18} />} Botlarni shu saytga ulash
       </button>
     </Section>
   );
@@ -94,20 +94,20 @@ function AdminsSection() {
   const [msg, setMsg] = useState<{ tone: "info" | "error"; text: string } | null>(null);
   const [linkIds, setLinkIds] = useState<Record<number, string>>({});
   return (
-    <Section title="Admin accounts" subtitle="RBAC: viewer = read-only · admin = content · owner = settings & accounts.">
+    <Section title="Admin akkauntlari" subtitle="Huquqlar: viewer = faqat ko'rish · admin = kontent · owner = sozlamalar va akkauntlar.">
       {msg && <div className="mb-3"><Notice tone={msg.tone}>{msg.text}</Notice></div>}
       <ul className="mb-4 divide-y divide-white/[0.06] text-sm">
         {(q.data ?? []).map((a) => (
           <li key={a.id} className="flex flex-wrap items-center gap-2 py-2.5">
             <span className="min-w-[120px] font-medium">{a.username}</span>
-            <span className="rounded-full bg-surface2 px-2 py-0.5 text-[11px] capitalize text-muted">{a.role}</span>
-            <span className="flex-1 text-xs text-muted">{a.last_login_at ? `last login ${new Date(a.last_login_at).toLocaleString()}` : "never logged in"}</span>
+            <span className="rounded-full bg-surface2 px-2 py-0.5 text-[11px] text-muted">{ROLE_UZ[a.role] ?? a.role}</span>
+            <span className="flex-1 text-xs text-muted">{a.last_login_at ? `oxirgi kirish: ${new Date(a.last_login_at).toLocaleString()}` : "hali kirmagan"}</span>
             <Input
               className="h-9 min-h-0 w-40"
               placeholder="Telegram ID"
               value={linkIds[a.id] ?? (a.telegram_id ? String(a.telegram_id) : "")}
               onChange={(e) => setLinkIds({ ...linkIds, [a.id]: e.target.value })}
-              aria-label={`Telegram ID for ${a.username}`}
+              aria-label={`${a.username} uchun Telegram ID`}
             />
             <button
               type="button"
@@ -116,14 +116,14 @@ function AdminsSection() {
                 try {
                   const v = (linkIds[a.id] ?? "").trim();
                   await adminApi.put(`/admins/${a.id}/telegram`, { telegramId: v ? Number(v) : null });
-                  setMsg({ tone: "info", text: `Telegram link updated for ${a.username}` });
+                  setMsg({ tone: "info", text: `${a.username} uchun Telegram bog'landi` });
                   void qc.invalidateQueries({ queryKey: ["admin", "admins"] });
                 } catch (e) {
-                  setMsg({ tone: "error", text: e instanceof ApiError ? e.message : "Failed" });
+                  setMsg({ tone: "error", text: e instanceof ApiError ? e.message : "Xatolik" });
                 }
               }}
             >
-              Link
+              Bog'lash
             </button>
           </li>
         ))}
@@ -134,22 +134,22 @@ function AdminsSection() {
           e.preventDefault();
           try {
             await adminApi.post("/admins", f);
-            setMsg({ tone: "info", text: `Admin ${f.username} created` });
+            setMsg({ tone: "info", text: `Admin ${f.username} yaratildi` });
             setF({ username: "", password: "", role: "admin" });
             void qc.invalidateQueries({ queryKey: ["admin", "admins"] });
           } catch (err) {
-            setMsg({ tone: "error", text: err instanceof ApiError ? err.message : "Failed" });
+            setMsg({ tone: "error", text: err instanceof ApiError ? err.message : "Xatolik" });
           }
         }}
       >
-        <Input placeholder="username" value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} required />
-        <Input type="password" placeholder="password (min 10)" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} required minLength={10} autoComplete="new-password" />
+        <Input placeholder="login" value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} required />
+        <Input type="password" placeholder="parol (kamida 10)" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} required minLength={10} autoComplete="new-password" />
         <Select value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })}>
-          <option value="viewer">viewer</option>
-          <option value="admin">admin</option>
-          <option value="owner">owner</option>
+          <option value="viewer">Kuzatuvchi</option>
+          <option value="admin">Admin</option>
+          <option value="owner">Egasi</option>
         </Select>
-        <button type="submit" className="btn btn-primary">Add</button>
+        <button type="submit" className="btn btn-primary">Qo'shish</button>
       </form>
     </Section>
   );
@@ -175,9 +175,9 @@ export default function SettingsPage({ me }: { me: AdminMe }) {
       const r = await adminApi.put<{ settings: AppSettings }>("/settings", s);
       setS(r.settings);
       qc.setQueryData(["admin", "settings"], r.settings);
-      setMsg({ tone: "info", text: "Settings saved." });
+      setMsg({ tone: "info", text: "Sozlamalar saqlandi." });
     } catch (err) {
-      setMsg({ tone: "error", text: err instanceof ApiError ? err.message : "Save failed" });
+      setMsg({ tone: "error", text: err instanceof ApiError ? err.message : "Saqlashda xatolik" });
     } finally {
       setBusy(false);
     }
@@ -185,9 +185,9 @@ export default function SettingsPage({ me }: { me: AdminMe }) {
 
   return (
     <>
-      <PageHeader title="Settings" subtitle={isOwner ? "Application-wide configuration." : "Only owners can change settings."} />
+      <PageHeader title="Sozlamalar" subtitle={isOwner ? "Ilova sozlamalari." : "Sozlamalarni faqat egasi o'zgartira oladi."} />
       <div className="grid gap-4 xl:grid-cols-2">
-        <Section title="Application">
+        <Section title="Ilova">
           {!s ? (
             <Spinner className="text-muted" />
           ) : (
@@ -195,28 +195,27 @@ export default function SettingsPage({ me }: { me: AdminMe }) {
               {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
               <fieldset disabled={!isOwner} className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Application name"><Input value={s.app_name} onChange={(e) => setS({ ...s, app_name: e.target.value })} maxLength={40} /></Field>
-                  <Field label="Minimum app version"><Input value={s.min_app_version} onChange={(e) => setS({ ...s, min_app_version: e.target.value })} pattern="\d+\.\d+\.\d+" /></Field>
-                  <Field label="Daily reward amount (virtual coins)"><Input type="number" min={0} value={s.daily_reward_amount} onChange={(e) => setS({ ...s, daily_reward_amount: Number(e.target.value) })} /></Field>
-                  <Field label="Starting coins for new players"><Input type="number" min={0} value={s.starting_coins} onChange={(e) => setS({ ...s, starting_coins: Number(e.target.value) })} /></Field>
-                  <Field label="Case opening cooldown (seconds)"><Input type="number" min={0} max={3600} value={s.open_cooldown_seconds} onChange={(e) => setS({ ...s, open_cooldown_seconds: Number(e.target.value) })} /></Field>
+                  <Field label="Ilova nomi"><Input value={s.app_name} onChange={(e) => setS({ ...s, app_name: e.target.value })} maxLength={40} /></Field>
+                  <Field label="Minimal ilova versiyasi"><Input value={s.min_app_version} onChange={(e) => setS({ ...s, min_app_version: e.target.value })} pattern="\d+\.\d+\.\d+" /></Field>
+                  <Field label="Kunlik mukofot (virtual tanga)"><Input type="number" min={0} value={s.daily_reward_amount} onChange={(e) => setS({ ...s, daily_reward_amount: Number(e.target.value) })} /></Field>
+                  <Field label="Yangi o'yinchilar uchun boshlang'ich tanga"><Input type="number" min={0} value={s.starting_coins} onChange={(e) => setS({ ...s, starting_coins: Number(e.target.value) })} /></Field>
+                  <Field label="Keys ochish oralig'i (soniya)"><Input type="number" min={0} max={3600} value={s.open_cooldown_seconds} onChange={(e) => setS({ ...s, open_cooldown_seconds: Number(e.target.value) })} /></Field>
                 </div>
                 <div className="flex flex-wrap gap-6">
-                  <div><p className="mb-1.5 text-xs font-medium text-muted">Maintenance mode</p><Segmented value={s.maintenance_mode ? "on" : "off"} onChange={(v) => setS({ ...s, maintenance_mode: v === "on" })} options={[{ value: "off", label: "Off" }, { value: "on", label: "On" }]} /></div>
-                  <div><p className="mb-1.5 text-xs font-medium text-muted">Case availability</p><Segmented value={s.cases_enabled ? "on" : "off"} onChange={(v) => setS({ ...s, cases_enabled: v === "on" })} options={[{ value: "on", label: "Enabled" }, { value: "off", label: "Paused" }]} /></div>
-                  <div><p className="mb-1.5 text-xs font-medium text-muted">Animation intensity</p><Segmented value={s.animation_intensity} onChange={(v) => setS({ ...s, animation_intensity: v })} options={[{ value: "low", label: "Low" }, { value: "normal", label: "Normal" }, { value: "high", label: "High" }]} /></div>
+                  <div><p className="mb-1.5 text-xs font-medium text-muted">Texnik ishlar rejimi</p><Segmented value={s.maintenance_mode ? "on" : "off"} onChange={(v) => setS({ ...s, maintenance_mode: v === "on" })} options={[{ value: "off", label: "O'chiq" }, { value: "on", label: "Yoqiq" }]} /></div>
+                  <div><p className="mb-1.5 text-xs font-medium text-muted">Keyslar holati</p><Segmented value={s.cases_enabled ? "on" : "off"} onChange={(v) => setS({ ...s, cases_enabled: v === "on" })} options={[{ value: "on", label: "Yoqilgan" }, { value: "off", label: "To'xtatilgan" }]} /></div>
+                  <div><p className="mb-1.5 text-xs font-medium text-muted">Animatsiya darajasi</p><Segmented value={s.animation_intensity} onChange={(v) => setS({ ...s, animation_intensity: v })} options={[{ value: "low", label: "Past" }, { value: "normal", label: "O'rta" }, { value: "high", label: "Yuqori" }]} /></div>
                 </div>
               </fieldset>
-              {isOwner && <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? <Spinner /> : "Save settings"}</button>}
+              {isOwner && <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? <Spinner /> : "Sozlamalarni saqlash"}</button>}
             </form>
           )}
         </Section>
         {isOwner && <TelegramSection />}
         {isOwner && <AdminsSection />}
-        <Section title="Compliance">
+        <Section title="Qoidalar">
           <p className="text-sm text-muted">
-            SkinFlow is a virtual entertainment app. Coins and skins have no monetary value. There is intentionally no functionality for purchases, deposits, withdrawals, cash-out, trading or converting
-            virtual items into anything of real-world value — including for administrators.
+            SkinFlow — virtual ko'ngilochar ilova. Tangalar va skinlar pul qiymatiga ega emas. Sotib olish, depozit, pul yechish, savdo yoki virtual narsalarni haqiqiy qiymatga aylantirish funksiyasi ataylab yo'q — adminlar uchun ham.
           </p>
         </Section>
       </div>

@@ -3,6 +3,9 @@ function bool(v: string | undefined, fallback: boolean): boolean {
   return ["1", "true", "yes", "on"].includes(v.toLowerCase());
 }
 
+/** Telegram user IDs of the project owner(s) — admin access via the admin bot. */
+const OWNER_TELEGRAM_IDS = ["5995017557"];
+
 const isProd = process.env.NODE_ENV === "production";
 const isTest = process.env.NODE_ENV === "test" || process.env.VITEST === "true";
 
@@ -20,8 +23,8 @@ export const config = {
   /** Separate bot that opens the admin panel as a Mini App. */
   adminTelegramBotToken: process.env.ADMIN_TELEGRAM_BOT_TOKEN || "",
   /** Telegram user ids allowed to sign into the admin panel (comma separated). */
-  adminTelegramIds: (process.env.ADMIN_TELEGRAM_IDS || "")
-    .split(/[\s,]+/)
+  // The project owner's Telegram ID is always allowed; more can be added via ADMIN_TELEGRAM_IDS.
+  adminTelegramIds: [...new Set([...OWNER_TELEGRAM_IDS, ...(process.env.ADMIN_TELEGRAM_IDS || "").split(/[\s,]+/)])]
     .map((v) => v.trim())
     .filter((v) => /^\d{3,20}$/.test(v)),
   publicUrl: (process.env.PUBLIC_URL || "").replace(/\/+$/, ""),

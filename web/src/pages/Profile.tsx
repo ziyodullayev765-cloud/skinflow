@@ -5,6 +5,7 @@ import { ErrorState } from "../components/ErrorState";
 import { Icon, type IconName } from "../components/Icon";
 import { SkinCard } from "../components/Skin";
 import { Page, TopBar } from "../components/TopBar";
+import { PromoCard } from "../components/PromoCard";
 import { Avatar, ProgressBar, SectionHeader, Skeleton } from "../components/ui";
 import { fmt, timeAgo } from "../lib/format";
 import { useT } from "../lib/i18n";
@@ -179,6 +180,8 @@ export default function Profile() {
             )}
           </div>
         </section>
+
+        <PromoCard />
 
         <nav className="card divide-y divide-white/[0.06]">
           {[

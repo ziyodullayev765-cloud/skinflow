@@ -2,7 +2,7 @@ import { config } from "../config.js";
 import { hashPassword } from "../lib/password.js";
 import { getPool, query, queryOne, withTransaction } from "./pool.js";
 import { schemaSql } from "./schema.js";
-import { CATALOG, DEFAULT_MISSIONS, DEFAULT_SETTINGS, RARITY_BASE_WEIGHT, WEAPON_NAMES, slugify } from "./catalog.js";
+import { CATALOG, DEFAULT_MISSIONS, DEFAULT_SETTINGS, LEGACY_WEAPON_NAMES, RARITY_BASE_WEIGHT, WEAPON_MODELS, slugify } from "./catalog.js";
 
 async function seedCatalog(): Promise<void> {
   const existing = await queryOne<{ n: number }>("SELECT count(*)::int AS n FROM skins");
@@ -32,7 +32,7 @@ async function seedCatalog(): Promise<void> {
           `INSERT INTO skins (slug, name, weapon_name, weapon_type, rarity, image_url, optimized_image_url, thumbnail_url, description, virtual_price, collection_id, featured)
            VALUES ($1,$2,$3,$4,$5,$6,$6,$6,$7,$8,$9,$10)
            ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name RETURNING id`,
-          [slug, s.name, WEAPON_NAMES[s.weapon], s.weapon, s.rarity, img, s.description, s.value, colRow.rows[0].id, s.rarity === "legendary"],
+          [slug, s.name, WEAPON_MODELS[s.model].name, s.weapon, s.rarity, img, s.description, s.value, colRow.rows[0].id, s.rarity === "legendary"],
         );
         const weight = Math.max(1, Math.round(RARITY_BASE_WEIGHT[s.rarity] / (perRarity.get(s.rarity) ?? 1)));
         await client.query(
@@ -42,6 +42,19 @@ async function seedCatalog(): Promise<void> {
       }
     }
   });
+}
+
+/** Renames seeded skins from the first release's placeholder weapon names to CS2 models (admin edits are kept). */
+async function syncCatalogWeaponNames(): Promise<void> {
+  for (const col of CATALOG) {
+    for (const s of col.skins) {
+      await query(`UPDATE skins SET weapon_name = $2, updated_at = now() WHERE slug = $1 AND weapon_name = ANY($3)`, [
+        slugify(`${s.weapon}-${s.name}`),
+        WEAPON_MODELS[s.model].name,
+        LEGACY_WEAPON_NAMES,
+      ]);
+    }
+  }
 }
 
 async function seedMissions(): Promise<void> {
@@ -104,6 +117,7 @@ export function ensureDatabase(): Promise<void> {
       }
       await seedSettings();
       await seedCatalog();
+      await syncCatalogWeaponNames();
       await seedMissions();
       await seedAdmin();
     })().catch((err) => {

@@ -7,7 +7,8 @@ import { ApiError } from "../lib/api";
 import { fmt } from "../lib/format";
 import { useTelegramBack } from "../lib/hooks";
 import { useT } from "../lib/i18n";
-import { useMe, useOpenCase } from "../lib/queries";
+import { useMe, useOpenCase, useSellSkin } from "../lib/queries";
+import { useToasts } from "../store/ui";
 import { playSound } from "../lib/sound";
 import { haptic } from "../lib/telegram";
 import type { GameCase, OpenResult, Rarity } from "../lib/types";
@@ -235,6 +236,9 @@ function Burst({ rarity }: { rarity: Rarity }) {
 
 function ResultCard({ result, onDone, onAgain, onView, canAgain, cost }: { result: OpenResult; onDone: () => void; onAgain: () => void; onView: () => void; canAgain: boolean; cost: number }) {
   const t = useT();
+  const sell = useSellSkin();
+  const push = useToasts((x) => x.push);
+  const [sold, setSold] = useState(false);
   const { skin } = result;
   const r = skin.rarity;
   const premium = r === "legendary";
@@ -278,15 +282,40 @@ function ResultCard({ result, onDone, onAgain, onView, canAgain, cost }: { resul
           <CoinIcon size={13} /> {fmt(skin.virtualPrice)} · {skin.collection}
         </p>
         <p className="relative mt-3 flex items-center justify-center gap-1.5 text-xs text-success">
-          <Icon name="check" size={14} /> {t("open.added")}
+          <Icon name="check" size={14} /> {sold ? t("sell.done", { amount: fmt(skin.virtualPrice) }) : t("open.added")}
         </p>
 
         <div className="relative mt-5 grid grid-cols-2 gap-2.5">
-          <Button variant="secondary" onClick={onView}>
-            {t("open.view")}
+          <Button
+            variant="secondary"
+            className="whitespace-nowrap border-coin/30 px-3 text-sm text-coin"
+            disabled={sold}
+            loading={sell.isPending}
+            onClick={() =>
+              sell.mutate(
+                { skinId: skin.id, quantity: 1 },
+                {
+                  onSuccess: (r) => {
+                    setSold(true);
+                    haptic.notify("success");
+                    playSound("achievement");
+                    push(t("sell.done", { amount: fmt(r.earned) }), "success");
+                  },
+                  onError: (e) => push(e instanceof ApiError ? e.message : "Error", "error"),
+                },
+              )
+            }
+          >
+            <CoinIcon size={14} />
+            {t("sell.button", { amount: fmt(skin.virtualPrice) })}
           </Button>
           <Button onClick={onDone}>{t("open.done")}</Button>
         </div>
+        {!sold && (
+          <button type="button" onClick={onView} className="btn btn-ghost relative mt-1 w-full text-sm">
+            {t("open.view")}
+          </button>
+        )}
         <button type="button" disabled={!canAgain} onClick={onAgain} className="btn btn-ghost relative mt-1 w-full text-sm">
           <Icon name="refresh" size={16} />
           {t("open.again")} · <CoinIcon size={12} /> {fmt(cost)}

@@ -14,7 +14,7 @@ export function LineChart({ data, color = "rgb(var(--accent))", height = 180 }: 
   const id = `lg-${color.replace(/[^a-z0-9]/gi, "")}`;
   return (
     <div className="relative">
-      <svg viewBox={`0 0 ${w} ${h}`} className="w-full" role="img" aria-label="Line chart" onMouseLeave={() => setHover(null)}>
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full" role="img" aria-label="Grafik" onMouseLeave={() => setHover(null)}>
         <defs>
           <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stopColor={color} stopOpacity="0.28" />
@@ -62,7 +62,7 @@ export function BarList({ data, colorFor }: { data: { label: string; value: numb
           </div>
         </li>
       ))}
-      {data.length === 0 && <li className="py-6 text-center text-xs text-muted">No data yet</li>}
+      {data.length === 0 && <li className="py-6 text-center text-xs text-muted">Hozircha ma'lumot yo'q</li>}
     </ul>
   );
 }
@@ -74,7 +74,7 @@ export function Donut({ data }: { data: { label: string; value: number; color: s
   let offset = 0;
   return (
     <div className="flex items-center gap-6">
-      <svg width="140" height="140" viewBox="0 0 140 140" role="img" aria-label="Rarity distribution">
+      <svg width="140" height="140" viewBox="0 0 140 140" role="img" aria-label="Noyoblik taqsimoti">
         <circle cx="70" cy="70" r={r} fill="none" stroke="currentColor" strokeOpacity="0.06" strokeWidth="16" />
         {total > 0 &&
           data.map((d) => {
@@ -89,7 +89,7 @@ export function Donut({ data }: { data: { label: string; value: number; color: s
           {fmt(total)}
         </text>
         <text x="70" y="84" textAnchor="middle" className="fill-current text-[10px] opacity-50">
-          drops
+          tushum
         </text>
       </svg>
       <ul className="space-y-1.5 text-xs">

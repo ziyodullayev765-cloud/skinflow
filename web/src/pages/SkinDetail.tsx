@@ -9,7 +9,11 @@ import { Button, CoinIcon, Skeleton } from "../components/ui";
 import { fmt, shortDate } from "../lib/format";
 import { useTelegramBack } from "../lib/hooks";
 import { useT } from "../lib/i18n";
-import { useInventoryItem, useToggleFavorite } from "../lib/queries";
+import { useInventoryItem, useSellSkin, useToggleFavorite } from "../lib/queries";
+import { useState } from "react";
+import { Sheet } from "../components/Sheet";
+import { useToasts } from "../store/ui";
+import { useErrorText } from "../components/ErrorState";
 import { playSound } from "../lib/sound";
 import { haptic } from "../lib/telegram";
 import { useSettings } from "../store/settings";
@@ -23,6 +27,11 @@ export default function SkinDetail() {
   const item = useInventoryItem(skinId);
   const fav = useToggleFavorite();
   const setFilters = useInventoryFilters((s) => s.set);
+  const sell = useSellSkin();
+  const push = useToasts((x) => x.push);
+  const errText = useErrorText();
+  const [sellOpen, setSellOpen] = useState(false);
+  const [sellQty, setSellQty] = useState(1);
   useTelegramBack();
 
   if (item.isLoading && !item.data)
@@ -89,7 +98,21 @@ export default function SkinDetail() {
             </dl>
             <p className="mt-2 text-[11px] text-muted">{t("detail.noValue")}</p>
 
-            <div className="mt-5 grid grid-cols-[auto_1fr_1fr] gap-2.5">
+            <Button
+              variant="secondary"
+              className="mt-5 w-full border-coin/30 text-coin"
+              onClick={() => {
+                setSellQty(1);
+                if (it.quantity > 1) setSellOpen(true);
+                else doSell(1);
+              }}
+              loading={sell.isPending}
+            >
+              <CoinIcon size={16} />
+              {t("sell.button", { amount: fmt(s.virtualPrice) })}
+            </Button>
+
+            <div className="mt-2.5 grid grid-cols-[auto_1fr_1fr] gap-2.5">
               <Button variant="secondary" onClick={() => navigate(-1)} aria-label={t("detail.back")} className="px-3.5">
                 <Icon name="back" size={18} />
               </Button>
@@ -121,6 +144,42 @@ export default function SkinDetail() {
           </section>
         </div>
       </Page>
+
+      <Sheet open={sellOpen} onClose={() => setSellOpen(false)} title={t("sell.title")}>
+        <div className="space-y-4">
+          <p className="text-sm text-muted">{s.weaponName} | {s.name}</p>
+          <div className="flex items-center justify-between rounded-2xl bg-surface2 p-2">
+            <button type="button" className="grid h-11 w-11 place-items-center rounded-xl text-xl" onClick={() => setSellQty((q) => Math.max(1, q - 1))} aria-label="-">−</button>
+            <div className="text-center">
+              <p className="font-display text-2xl font-bold tabular-nums">{sellQty}</p>
+              <p className="text-[11px] text-muted">{t("sell.quantity")} · max {it.quantity}</p>
+            </div>
+            <button type="button" className="grid h-11 w-11 place-items-center rounded-xl text-xl" onClick={() => setSellQty((q) => Math.min(it.quantity, q + 1))} aria-label="+">+</button>
+          </div>
+          <button type="button" className="text-xs text-accent" onClick={() => setSellQty(it.quantity)}>max ×{it.quantity}</button>
+          <Button className="w-full" loading={sell.isPending} onClick={() => doSell(sellQty)}>
+            <CoinIcon size={16} />
+            {t("sell.confirm", { count: sellQty, amount: fmt(sellQty * s.virtualPrice) })}
+          </Button>
+          <p className="text-[11px] leading-relaxed text-muted">{t("sell.note")}</p>
+        </div>
+      </Sheet>
     </>
   );
+
+  function doSell(quantity: number) {
+    sell.mutate(
+      { skinId: s.id, quantity },
+      {
+        onSuccess: (r) => {
+          haptic.notify("success");
+          playSound("achievement");
+          push(t("sell.done", { amount: fmt(r.earned) }), "success");
+          setSellOpen(false);
+          if (r.remaining <= 0) navigate("/inventory", { replace: true });
+        },
+        onError: (e) => push(errText(e).title, "error"),
+      },
+    );
+  }
 }

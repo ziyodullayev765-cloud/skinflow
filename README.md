@@ -22,7 +22,8 @@ A premium **Telegram Mini App** for collecting fictional, CS2-inspired weapon sk
 - Case opening with a server-generated reel: case shake → open → decelerating carousel → rarity-specific reveal (subtle → animated border → particles → premium legendary reveal); skip button; reduced-motion path
 - Inventory with search, rarity / weapon / collection filters, newest / rarity / value sort, 2→5 column responsive grid, virtualisation for large inventories
 - Skin detail (favorite, collection view), collections with completion, achievements, opening history, level/XP, streaks
-- Daily reward (fixed amount), daily / weekly / one-time missions — virtual coins only
+- Daily reward (fixed amount), daily / weekly / one-time missions, promo codes — virtual coins only
+- Sell skins back for virtual coins (in-app only; coins can never be withdrawn or bought)
 - Settings: language (English / Русский / O'zbekcha), sound, animations, haptics, dark theme, reduced motion
 - Telegram integration: `ready()`, `expand()`, theme & safe-area insets, native BackButton & MainButton, haptics; particles pause when the app is backgrounded
 - Skeleton loaders everywhere, friendly error states with retry (network, server, unauthorized, invalid session, insufficient coins, rate limit, case unavailable, inventory)
@@ -34,6 +35,7 @@ A premium **Telegram Mini App** for collecting fictional, CS2-inspired weapon sk
 - **Skins**: drag-&-drop upload (PNG/JPG/WEBP, size check, preview), automatic WebP optimisation + thumbnail, live preview, virtual price, rarity, weapon, collection (pick or create), active/featured; table with Edit / Duplicate / Activate-Deactivate / Delete
 - **Cases**: create/edit, upload image, set cost, assign skins with explicit drop weights, live probability table, case preview, 5 000-opening simulation (no effect on players), deactivate
 - Users & inventory inspection (coins, skins, openings, missions), audited virtual-coin adjustments, block/unblock
+- Promo codes (reward, usage limit, expiry), bulk weapon renaming, CS2 weapon name suggestions; admin UI in Uzbek
 - Openings, missions CRUD (daily/weekly/once), daily reward log, settings (app name, maintenance, animation intensity, daily reward, case availability, min version, cooldown), admin accounts (RBAC owner/admin/viewer), Telegram bot setup, audit logs
 
 ## Security
@@ -75,7 +77,7 @@ npm run assets                # regenerate the original placeholder artwork & so
 | `SESSION_SECRET` | ≥ 32 random characters |
 | `TELEGRAM_BOT_TOKEN` | Player bot token (verifies `initData`) |
 | `ADMIN_TELEGRAM_BOT_TOKEN` | Admin bot token (opens `/admin` as a Mini App) |
-| `ADMIN_TELEGRAM_IDS` | Comma-separated Telegram user IDs allowed into the admin panel |
+| `ADMIN_TELEGRAM_IDS` | Extra Telegram user IDs allowed into the admin panel (the owner ID in `server/config.ts` is always allowed) |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | First owner account (created once) |
 | `ALLOW_GUEST_LOGIN` | `true` to let browser visitors try the app without Telegram |
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob (image storage) |

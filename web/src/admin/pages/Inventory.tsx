@@ -13,7 +13,7 @@ export default function InventoryPage() {
   const q = useUserList(search, page);
   return (
     <>
-      <PageHeader title="Inventory" subtitle="Inspect any player's virtual coins, skins, opening history and missions." />
+      <PageHeader title="Inventar" subtitle="Istalgan o'yinchining virtual tangalari, skinlari, ochilishlar tarixi va vazifalarini ko'ring." />
       <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
         <DataTable
           columns={userColumns.slice(0, 3)}
@@ -21,13 +21,13 @@ export default function InventoryPage() {
           loading={q.isLoading}
           rowKey={(u) => u.id}
           onRowClick={(u) => setSelected(u.id)}
-          search={{ value: search, onChange: setSearch, placeholder: "Find a user…" }}
+          search={{ value: search, onChange: setSearch, placeholder: "Foydalanuvchini toping…" }}
           page={page}
           total={q.data?.total}
           onPage={setPage}
         />
         <div className="card p-5">
-          {selected ? <UserDetail key={selected} userId={selected} canEdit={false} /> : <Notice>Select a user to inspect their inventory.</Notice>}
+          {selected ? <UserDetail key={selected} userId={selected} canEdit={false} /> : <Notice>Inventarini ko'rish uchun foydalanuvchini tanlang.</Notice>}
         </div>
       </div>
     </>

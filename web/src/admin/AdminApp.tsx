@@ -8,7 +8,7 @@ import { Skeleton, Spinner } from "../components/ui";
 import { ApiError } from "../lib/api";
 import { initData, isTelegram } from "../lib/telegram";
 import { adminApi, setAdminUnauthorized, setCsrf } from "./api";
-import { Field, Input, Notice } from "./components/kit";
+import { Field, Input, Notice, ROLE_UZ } from "./components/kit";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Users = lazy(() => import("./pages/Users"));
@@ -18,6 +18,7 @@ const InventoryPage = lazy(() => import("./pages/Inventory"));
 const Openings = lazy(() => import("./pages/Openings"));
 const Missions = lazy(() => import("./pages/Missions"));
 const Rewards = lazy(() => import("./pages/Rewards"));
+const PromoCodes = lazy(() => import("./pages/PromoCodes"));
 const SettingsPage = lazy(() => import("./pages/Settings"));
 const Logs = lazy(() => import("./pages/Logs"));
 
@@ -28,16 +29,17 @@ export interface AdminMe {
 }
 
 const NAV: { to: string; label: string; icon: IconName }[] = [
-  { to: "/admin", label: "Dashboard", icon: "dashboard" },
-  { to: "/admin/users", label: "Users", icon: "users" },
-  { to: "/admin/cases", label: "Cases", icon: "cases" },
-  { to: "/admin/skins", label: "Skins", icon: "skins" },
-  { to: "/admin/inventory", label: "Inventory", icon: "inventory" },
-  { to: "/admin/openings", label: "Openings", icon: "history" },
-  { to: "/admin/missions", label: "Missions", icon: "missions" },
-  { to: "/admin/rewards", label: "Rewards", icon: "gift" },
-  { to: "/admin/settings", label: "Settings", icon: "settings" },
-  { to: "/admin/logs", label: "Logs", icon: "list" },
+  { to: "/admin", label: "Boshqaruv paneli", icon: "dashboard" },
+  { to: "/admin/users", label: "Foydalanuvchilar", icon: "users" },
+  { to: "/admin/cases", label: "Keyslar", icon: "cases" },
+  { to: "/admin/skins", label: "Skinlar", icon: "skins" },
+  { to: "/admin/inventory", label: "Inventar", icon: "inventory" },
+  { to: "/admin/openings", label: "Ochilishlar", icon: "history" },
+  { to: "/admin/missions", label: "Vazifalar", icon: "missions" },
+  { to: "/admin/rewards", label: "Mukofotlar", icon: "gift" },
+  { to: "/admin/promo", label: "Promokodlar", icon: "sparkle" },
+  { to: "/admin/settings", label: "Sozlamalar", icon: "settings" },
+  { to: "/admin/logs", label: "Loglar", icon: "list" },
 ];
 
 function Login({ onDone }: { onDone: (me: AdminMe) => void }) {
@@ -76,7 +78,7 @@ function Login({ onDone }: { onDone: (me: AdminMe) => void }) {
       setCsrf(r.csrfToken);
       onDone(r.admin);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Login failed");
+      setError(err instanceof ApiError ? err.message : "Kirishda xatolik");
     } finally {
       setBusy(false);
     }
@@ -85,12 +87,12 @@ function Login({ onDone }: { onDone: (me: AdminMe) => void }) {
   return (
     <div className="relative grid min-h-screen place-items-center px-4">
       <div className="pointer-events-none absolute left-1/2 top-0 h-80 w-80 -translate-x-1/2 rounded-full bg-accent/15 blur-3xl" />
-      <motion.form onSubmit={submit} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="card relative w-full max-w-sm p-6" aria-label="Admin sign in">
+      <motion.form onSubmit={submit} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="card relative w-full max-w-sm p-6" aria-label="Admin kirishi">
         <div className="mb-6 flex items-center gap-3">
           <img src="/assets/icons/app.svg" alt="" className="h-10 w-10" />
           <div>
             <h1 className="font-display text-lg font-bold">SkinFlow Admin</h1>
-            <p className="text-xs text-muted">Restricted area</p>
+            <p className="text-xs text-muted">Yopiq hudud</p>
           </div>
         </div>
         {error && (
@@ -99,7 +101,7 @@ function Login({ onDone }: { onDone: (me: AdminMe) => void }) {
               {error}
               {tgId && (
                 <span className="mt-1 block text-xs text-fg/80">
-                  Your Telegram ID: <b className="select-all">{tgId}</b> — add it to <code>ADMIN_TELEGRAM_IDS</code>.
+                  Telegram ID'ingiz: <b className="select-all">{tgId}</b> — uni qo'shing: <code>ADMIN_TELEGRAM_IDS</code>.
                 </span>
               )}
             </Notice>
@@ -107,18 +109,18 @@ function Login({ onDone }: { onDone: (me: AdminMe) => void }) {
         )}
         {isTelegram() && busy ? (
           <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted">
-            <Spinner /> Signing in with Telegram…
+            <Spinner /> Telegram orqali kirilmoqda…
           </div>
         ) : (
           <div className="space-y-3.5">
-            <Field label="Username or email">
-              <Input autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required maxLength={120} autoFocus />
+            <Field label="Login yoki email">
+              <Input autoComplete="login" value={username} onChange={(e) => setUsername(e.target.value)} required maxLength={120} autoFocus />
             </Field>
-            <Field label="Password">
+            <Field label="Parol">
               <Input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required maxLength={200} />
             </Field>
             <button type="submit" className="btn btn-primary w-full" disabled={busy}>
-              {busy ? <Spinner /> : "Sign in"}
+              {busy ? <Spinner /> : "Kirish"}
             </button>
           </div>
         )}
@@ -160,16 +162,16 @@ function Sidebar({ collapsed, onCollapse, onNavigate, me, onLogout }: { collapse
         {!collapsed && (
           <div className="mb-1 px-3 py-2 text-xs">
             <p className="truncate font-semibold">{me.username}</p>
-            <p className="capitalize text-muted">{me.role}</p>
+            <p className="text-muted">{ROLE_UZ[me.role] ?? me.role}</p>
           </div>
         )}
         <div className={clsx("flex gap-1", collapsed && "flex-col items-center")}>
-          <button type="button" onClick={onLogout} className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl text-sm text-muted hover:bg-white/[0.03] hover:text-fg" title="Log out">
+          <button type="button" onClick={onLogout} className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl text-sm text-muted hover:bg-white/[0.03] hover:text-fg" title="Chiqish">
             <Icon name="logout" size={18} />
-            {!collapsed && "Log out"}
+            {!collapsed && "Chiqish"}
           </button>
           {onCollapse && (
-            <button type="button" onClick={onCollapse} className="grid h-10 w-10 place-items-center rounded-xl text-muted hover:bg-white/[0.03] hover:text-fg" aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
+            <button type="button" onClick={onCollapse} className="grid h-10 w-10 place-items-center rounded-xl text-muted hover:bg-white/[0.03] hover:text-fg" aria-label={collapsed ? "Menyuni yoyish" : "Menyuni yig'ish"}>
               <Icon name="collapse" size={18} className={clsx("transition-transform", collapsed && "rotate-180")} />
             </button>
           )}
@@ -225,7 +227,7 @@ function Shell({ me, onLogout }: { me: AdminMe; onLogout: () => void }) {
 
       <div className={clsx("transition-[padding] duration-300", collapsed ? "lg:pl-[76px]" : "lg:pl-[248px]")}>
         <header className="glass sticky top-0 z-20 flex h-14 items-center gap-3 border-b hairline px-4 lg:hidden safe-top">
-          <button type="button" onClick={() => setDrawer(true)} className="-ml-2 grid h-11 w-11 place-items-center rounded-xl text-muted" aria-label="Open menu">
+          <button type="button" onClick={() => setDrawer(true)} className="-ml-2 grid h-11 w-11 place-items-center rounded-xl text-muted" aria-label="Menyuni ochish">
             <Icon name="menu" size={22} />
           </button>
           <span className="font-display font-semibold">SkinFlow Admin</span>
@@ -248,6 +250,7 @@ function Shell({ me, onLogout }: { me: AdminMe; onLogout: () => void }) {
               <Route path="openings" element={<Openings />} />
               <Route path="missions" element={<Missions me={me} />} />
               <Route path="rewards" element={<Rewards />} />
+              <Route path="promo" element={<PromoCodes me={me} />} />
               <Route path="settings" element={<SettingsPage me={me} />} />
               <Route path="logs" element={<Logs />} />
               <Route path="*" element={<Dashboard />} />
@@ -302,7 +305,7 @@ function AdminRoot() {
   if (session.isError)
     return (
       <div className="grid min-h-screen place-items-center px-4">
-        <Notice tone="error">Couldn't reach the server. <button className="underline" onClick={() => void session.refetch()}>Retry</button></Notice>
+        <Notice tone="error">Serverga ulanib bo'lmadi. <button className="underline" onClick={() => void session.refetch()}>Qayta urinish</button></Notice>
       </div>
     );
   if (!me) return <Login onDone={(m) => setMe(m)} />;

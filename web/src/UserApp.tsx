@@ -55,7 +55,6 @@ function Shell() {
   const location = useLocation();
   const missions = useMissions();
   const claimable = missions.data?.filter((m) => m.completed && !m.claimed).length ?? 0;
-  const hideNav = /^\/cases\/\d+/.test(location.pathname);
 
   useEffect(() => {
     window.scrollTo({ top: 0 });
@@ -63,7 +62,7 @@ function Shell() {
 
   return (
     <MotionConfig reducedMotion={reduced ? "always" : "never"}>
-      <div className="relative mx-auto min-h-screen w-full overflow-x-hidden" style={{ paddingBottom: hideNav ? 0 : "calc(76px + env(safe-area-inset-bottom))" }}>
+      <div className="relative mx-auto min-h-screen w-full overflow-x-hidden" style={{ paddingBottom: "calc(76px + env(safe-area-inset-bottom))" }}>
         <Suspense fallback={<PageSkeleton variant={location.pathname.startsWith("/inventory") ? "grid" : location.pathname === "/" ? "home" : "list"} />}>
           <Routes>
             <Route path="/" element={<Home />} />
@@ -80,7 +79,7 @@ function Shell() {
           </Routes>
         </Suspense>
       </div>
-      {!hideNav && <BottomNav badge={claimable} />}
+      <BottomNav badge={claimable} />
       <Toasts />
     </MotionConfig>
   );

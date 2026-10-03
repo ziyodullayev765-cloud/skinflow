@@ -4,7 +4,7 @@
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { CATALOG, slugify, type Pattern, type WeaponType } from "../server/db/catalog.js";
+import { CATALOG, slugify, type Pattern, type WeaponModel } from "../server/db/catalog.js";
 
 const OUT = path.resolve("web/public/assets");
 for (const d of ["skins", "cases", "icons", "avatars", "sounds"]) mkdirSync(path.join(OUT, d), { recursive: true });
@@ -22,57 +22,111 @@ function rng(seed: string) {
   };
 }
 
-// ---------------------------------------------------------------- weapon silhouettes (original, stylised)
-type Shape = string; // polygon points, or "r:x,y,w,h,rx" for rounded rects
-const WEAPONS: Record<WeaponType, Shape[]> = {
-  rifle: [
-    "18,118 92,104 100,104 100,150 70,170 20,168 14,150",
-    "96,96 300,96 312,108 312,140 96,140",
-    "300,104 400,104 404,134 300,134",
-    "400,112 492,112 492,124 400,124",
-    "380,88 392,88 392,104 380,104",
-    "150,80 250,80 256,96 144,96",
-    "222,138 256,138 270,204 240,212",
-    "150,138 182,138 172,192 146,190",
+// ---------------------------------------------------------------- weapon silhouettes (CS2 models, original drawings)
+// Shapes: polygon points, "r:x,y,w,h,rx" rounded rect, or "p:<svg path>" (even-odd fill for holes).
+type Shape = string;
+const WEAPONS: Record<WeaponModel, Shape[]> = {
+  ak47: [
+    "p:M10 116 L104 98 L112 98 L112 136 L98 140 L34 166 Q18 170 12 160 Z",
+    "108,96 272,96 278,102 278,134 108,136",
+    "118,88 264,88 270,96 112,96",
+    "150,134 180,134 172,184 146,190 142,172",
+    "p:M182 134 L214 134 L212 148 Q198 154 186 148 Z",
+    "p:M224 134 L254 134 Q262 160 282 192 L256 206 Q236 172 224 134 Z",
+    "278,108 372,108 372,134 278,134",
+    "278,98 376,98 376,108 278,108",
+    "372,111 478,111 478,119 372,119",
+    "452,94 462,94 466,111 450,111",
+    "r:476,106,20,18,3",
   ],
-  smg: [
-    "40,110 110,104 110,138 60,150 40,146",
-    "106,92 330,92 340,104 340,138 106,138",
-    "336,108 430,108 430,122 336,122",
-    "250,136 278,136 282,214 254,214",
-    "150,136 182,136 174,196 146,194",
-    "180,78 280,78 284,92 176,92",
+  m4a4: [
+    "p:M16 108 L94 102 L100 102 L100 142 L70 152 L22 152 Q14 150 14 140 Z",
+    "96,111 130,111 130,127 96,127",
+    "126,98 278,98 286,108 286,138 126,138",
+    "130,89 274,89 274,98 130,98",
+    "134,78 152,78 154,89 132,89",
+    "150,136 178,136 170,188 144,186",
+    "p:M214 136 L244 136 L252 196 Q238 202 224 200 Z",
+    "286,101 398,101 398,135 286,135",
+    "378,82 390,82 394,101 374,101",
+    "398,112 468,112 468,121 398,121",
+    "r:466,107,26,19,4",
   ],
-  pistol: [
-    "120,84 380,84 392,96 392,126 120,126",
-    "130,124 360,124 350,140 260,140",
-    "150,124 220,124 238,222 172,228 160,200",
-    "220,138 266,138 262,166 228,160",
-    "392,100 410,100 410,116 392,116",
+  awp: [
+    "p:M4 122 L72 106 L134 106 L134 150 L116 150 Q110 130 96 130 Q86 132 84 150 L42 168 Q12 172 6 158 Z",
+    "130,104 302,104 308,140 130,142",
+    "302,112 488,110 488,121 302,125",
+    "r:484,104,24,22,4",
+    "r:156,72,128,20,10",
+    "r:278,64,32,34,8",
+    "r:138,68,24,28,7",
+    "182,90 194,90 194,104 182,104",
+    "250,90 262,90 262,104 250,104",
+    "p:M200 108 L214 108 L226 126 Q220 132 212 128 Z",
+    "228,140 254,140 256,170 230,170",
+    "p:M420 124 L428 124 L446 186 L438 188 Z",
   ],
-  sniper: [
-    "10,120 110,108 120,108 120,150 90,164 24,170 10,156",
-    "116,104 300,104 306,140 116,140",
-    "300,114 500,112 500,122 300,126",
-    "r:144,68,152,24,12",
-    "180,88 192,88 192,104 180,104",
-    "250,88 262,88 262,104 250,104",
-    "220,138 248,138 252,176 222,176",
-    "130,138 160,138 152,190 126,188",
-    "420,124 428,124 444,180 436,182",
+  deagle: [
+    "p:M116 80 L402 80 L412 90 L412 130 L116 130 Q108 128 108 120 L108 92 Q108 82 116 80 Z",
+    "104,84 120,84 120,104 104,104",
+    "128,128 384,128 376,144 252,146",
+    "p:M148 128 L228 128 L250 228 Q214 238 178 232 L160 204 Z",
+    "p:M228 142 L276 142 L270 172 Q250 176 234 166 Z",
   ],
-  shotgun: [
-    "16,116 110,104 116,104 116,146 80,166 22,166 12,150",
-    "112,100 260,100 266,140 112,140",
-    "260,104 488,104 488,120 260,120",
-    "r:300,122,140,20,6",
-    "140,138 172,138 162,188 136,186",
+  glock: [
+    "p:M150 92 L380 92 Q390 92 390 102 L390 128 L150 128 Z",
+    "156,126 378,126 372,142 252,146",
+    "p:M168 126 L232 126 L254 220 Q222 230 188 226 L178 200 Z",
+    "p:M232 140 L278 140 L272 168 Q252 172 238 164 Z",
   ],
-  knife: [
-    "200,118 440,104 492,96 470,124 420,142 200,144",
-    "r:184,96,22,68,6",
-    "60,112 190,112 190,148 70,152 50,140",
-    "r:36,114,28,38,10",
+  usps: [
+    "p:M108 92 L300 92 Q308 92 308 100 L308 128 L108 128 Z",
+    "114,126 296,126 290,142 212,146",
+    "p:M124 126 L188 126 L208 220 Q176 230 144 226 L134 200 Z",
+    "p:M190 140 L232 140 L228 168 Q208 172 196 164 Z",
+    "r:306,95,186,30,14",
+  ],
+  p90: [
+    "p:M36 124 Q40 100 76 94 L380 90 Q424 96 432 124 Q430 146 390 152 L304 152 L284 194 Q266 202 248 196 L240 152 L126 152 L104 184 Q84 192 66 184 L64 154 Q38 148 36 124 Z",
+    "r:146,72,236,18,6",
+    "432,112 474,112 474,124 432,124",
+    "p:M96 124 Q100 108 120 108 Q140 108 140 124 Z",
+  ],
+  mp9: [
+    "p:M26 106 L110 106 L110 118 L44 118 L44 142 L26 142 Z",
+    "106,96 334,96 342,106 342,134 106,134",
+    "132,87 322,87 322,96 132,96",
+    "p:M190 132 L222 132 L232 214 Q214 220 198 214 Z",
+    "p:M290 132 L308 132 L304 172 L288 172 Z",
+    "342,108 404,108 404,121 342,121",
+  ],
+  nova: [
+    "p:M8 116 L104 104 L112 104 L112 144 L80 164 L22 164 Q8 160 8 148 Z",
+    "108,100 248,100 254,140 108,140",
+    "248,102 494,102 494,116 248,116",
+    "248,118 440,118 440,129 248,129",
+    "r:296,115,128,30,9",
+    "p:M140 138 L172 138 L164 156 Q150 160 140 152 Z",
+  ],
+  xm1014: [
+    "p:M14 110 L98 104 L104 104 L104 142 L64 152 L20 152 Q12 150 12 140 Z",
+    "100,112 132,112 132,126 100,126",
+    "128,98 272,98 278,140 128,140",
+    "136,89 266,89 266,98 136,98",
+    "150,138 178,138 170,188 144,186",
+    "272,102 488,102 488,114 272,114",
+    "272,117 432,117 432,131 272,131",
+  ],
+  karambit: [
+    "p:M66 128 A36 36 0 1 0 138 128 A36 36 0 1 0 66 128 Z M84 128 A18 18 0 1 0 120 128 A18 18 0 1 0 84 128 Z",
+    "p:M132 110 L272 98 Q294 98 296 118 L292 142 L140 152 Q130 140 132 110 Z",
+    "p:M290 100 Q372 66 476 52 Q446 104 352 146 Q312 160 292 140 Z",
+  ],
+  butterfly: [
+    "r:30,102,200,24,9",
+    "r:30,132,200,24,9",
+    "r:16,110,24,40,7",
+    "p:M226 108 L424 106 Q474 110 498 124 L474 140 Q440 152 226 150 Z",
   ],
   gloves: [
     "r:176,30,34,70,16",
@@ -82,6 +136,7 @@ const WEAPONS: Record<WeaponType, Shape[]> = {
     "r:172,70,152,112,26",
     "320,108 372,84 392,100 384,120 336,160",
     "r:166,170,166,64,14",
+    "r:166,188,166,14,4",
   ],
 };
 
@@ -90,6 +145,7 @@ function shapeEl(s: Shape, attrs = ""): string {
     const [x, y, w, h, rx] = s.slice(2).split(",");
     return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" ${attrs}/>`;
   }
+  if (s.startsWith("p:")) return `<path d="${s.slice(2)}" fill-rule="evenodd" clip-rule="evenodd" ${attrs}/>`;
   return `<polygon points="${s}" ${attrs}/>`;
 }
 
@@ -164,7 +220,7 @@ function patternDefs(id: string, p: Pattern, c: [string, string, string], seed: 
   }
 }
 
-function skinSvg(slug: string, weapon: WeaponType, pattern: Pattern, colors: [string, string, string]): string {
+function skinSvg(slug: string, weapon: WeaponModel, pattern: Pattern, colors: [string, string, string]): string {
   const shapes = WEAPONS[weapon];
   const id = slug.replace(/[^a-z0-9]/g, "");
   const { defs, overlay } = patternDefs(`p${id}`, pattern, colors, slug);
@@ -180,37 +236,61 @@ ${outline}
 </svg>`;
 }
 
-// ---------------------------------------------------------------- cases
+// ---------------------------------------------------------------- cases (3/4 view hard weapon case)
 const EMBLEMS: Record<string, (a: string) => string> = {
-  starter: (a) => `<circle cx="128" cy="150" r="26" fill="none" stroke="${a}" stroke-width="6"/><circle cx="128" cy="150" r="9" fill="${a}"/>`,
-  neon: (a) => `<path d="M136 118 L110 156 H128 L118 184 L148 142 H130 Z" fill="${a}"/>`,
-  tactical: (a) => `<path d="M100 140 L128 124 L156 140 M100 160 L128 144 L156 160 M100 180 L128 164 L156 180" fill="none" stroke="${a}" stroke-width="7" stroke-linejoin="round"/>`,
-  elite: (a) => `<path d="M128 120 L156 150 L128 182 L100 150 Z" fill="none" stroke="${a}" stroke-width="6"/><path d="M128 136 L142 150 L128 166 L114 150 Z" fill="${a}"/>`,
-  shadow: (a) => `<path d="M140 124 A30 30 0 1 0 140 178 A24 24 0 1 1 140 124 Z" fill="${a}"/>`,
-  spectrum: (a) => `<path d="M128 120 L158 176 H98 Z" fill="none" stroke="${a}" stroke-width="6" stroke-linejoin="round"/><path d="M128 146 L170 160" stroke="#ff7fc4" stroke-width="3"/><path d="M128 146 L170 168" stroke="#5ce1e6" stroke-width="3"/><path d="M128 146 L170 152" stroke="#f5ff6b" stroke-width="3"/>`,
+  starter: (a) => `<circle cx="0" cy="0" r="17" fill="none" stroke="${a}" stroke-width="4"/><circle r="6" fill="${a}"/>`,
+  neon: (a) => `<path d="M5 -20 L-12 4 H0 L-6 22 L14 -4 H2 Z" fill="${a}"/>`,
+  tactical: (a) => `<path d="M-18 -10 L0 -20 L18 -10 M-18 2 L0 -8 L18 2 M-18 14 L0 4 L18 14" fill="none" stroke="${a}" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round"/>`,
+  elite: (a) => `<path d="M-20 10 L-16 -14 L-6 -2 L0 -18 L6 -2 L16 -14 L20 10 Z" fill="${a}"/><rect x="-20" y="13" width="40" height="5" rx="2" fill="${a}"/>`,
+  shadow: (a) => `<circle r="19" fill="${a}"/><circle cx="9" cy="-6" r="16" fill="#1d2129"/>`,
+  spectrum: (a) => `<path d="M0 -20 L20 16 H-20 Z" fill="none" stroke="${a}" stroke-width="4" stroke-linejoin="round"/><path d="M-2 0 L24 -6 M-2 0 L24 2 M-2 0 L24 10" stroke-width="2.6" stroke="#ff7fc4"/><path d="M-2 0 L24 2" stroke-width="2.6" stroke="#5ce1e6"/><path d="M-2 0 L24 10" stroke-width="2.6" stroke="#f5ff6b"/>`,
 };
 
 function caseSvg(slug: string, accent: string): string {
   const emblem = (EMBLEMS[slug] ?? EMBLEMS.starter)(accent);
+  // Geometry: front face 30..206 x 104..194, depth offset (+22, -24)
+  const ridges = [128, 142, 156, 170].map((y) => `<rect x="44" y="${y}" width="148" height="3" rx="1.5" fill="#000" opacity=".35"/><rect x="44" y="${y + 3}" width="148" height="1" fill="#fff" opacity=".06"/>`).join("");
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
 <defs>
-<linearGradient id="b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a2f38"/><stop offset="1" stop-color="#14171c"/></linearGradient>
-<linearGradient id="l" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a404b"/><stop offset="1" stop-color="#22262d"/></linearGradient>
-<linearGradient id="a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${accent}" stop-opacity=".9"/><stop offset="1" stop-color="${accent}" stop-opacity=".25"/></linearGradient>
-<radialGradient id="g" cx=".5" cy=".55" r=".5"><stop offset="0" stop-color="${accent}" stop-opacity=".35"/><stop offset="1" stop-color="${accent}" stop-opacity="0"/></radialGradient>
-<radialGradient id="sh" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#000" stop-opacity=".55"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+<linearGradient id="front" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a414d"/><stop offset=".55" stop-color="#232830"/><stop offset="1" stop-color="#15181d"/></linearGradient>
+<linearGradient id="top" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#4a525f"/><stop offset="1" stop-color="#2d333c"/></linearGradient>
+<linearGradient id="side" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#1b1f25"/><stop offset="1" stop-color="#101216"/></linearGradient>
+<linearGradient id="acc" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="${accent}" stop-opacity=".15"/><stop offset=".5" stop-color="${accent}"/><stop offset="1" stop-color="${accent}" stop-opacity=".15"/></linearGradient>
+<radialGradient id="glow" cx=".5" cy=".55" r=".5"><stop offset="0" stop-color="${accent}" stop-opacity=".42"/><stop offset="1" stop-color="${accent}" stop-opacity="0"/></radialGradient>
+<radialGradient id="badge" cx=".5" cy=".4" r=".6"><stop offset="0" stop-color="#2f3540"/><stop offset="1" stop-color="#14171c"/></radialGradient>
+<radialGradient id="sh" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#000" stop-opacity=".6"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+<linearGradient id="metal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9cfd8"/><stop offset=".5" stop-color="#7d8592"/><stop offset="1" stop-color="#4b525d"/></linearGradient>
 </defs>
-<circle cx="128" cy="140" r="118" fill="url(#g)"/>
-<ellipse cx="128" cy="222" rx="96" ry="12" fill="url(#sh)"/>
-<rect x="40" y="96" width="176" height="120" rx="14" fill="url(#b)" stroke="#000" stroke-opacity=".5" stroke-width="2"/>
-<rect x="40" y="96" width="176" height="120" rx="14" fill="none" stroke="#fff" stroke-opacity=".07" stroke-width="1.5"/>
-<rect x="32" y="70" width="192" height="36" rx="10" fill="url(#l)" stroke="#000" stroke-opacity=".5" stroke-width="2"/>
-<rect x="32" y="70" width="192" height="6" rx="3" fill="#fff" opacity=".12"/>
-<rect x="110" y="96" width="36" height="16" rx="4" fill="url(#a)"/>
-<rect x="40" y="200" width="176" height="4" fill="url(#a)" opacity=".7"/>
-<rect x="52" y="116" width="6" height="88" rx="3" fill="url(#a)" opacity=".5"/>
-<rect x="198" y="116" width="6" height="88" rx="3" fill="url(#a)" opacity=".5"/>
+<circle cx="128" cy="140" r="122" fill="url(#glow)"/>
+<ellipse cx="136" cy="214" rx="104" ry="13" fill="url(#sh)"/>
+<!-- side -->
+<path d="M206 104 L228 80 L228 170 Q228 176 222 180 L206 194 Z" fill="url(#side)" stroke="#000" stroke-opacity=".55" stroke-width="1.5"/>
+<!-- top -->
+<path d="M30 104 L52 80 L228 80 L206 104 Z" fill="url(#top)" stroke="#000" stroke-opacity=".55" stroke-width="1.5"/>
+<path d="M52 80 L228 80" stroke="#fff" stroke-opacity=".18" stroke-width="1.5"/>
+<!-- handle -->
+<path d="M104 92 L108 74 Q110 66 118 66 L152 66 Q160 66 162 74 L166 92" fill="none" stroke="#0d0f12" stroke-width="9" stroke-linecap="round"/>
+<path d="M104 92 L108 74 Q110 66 118 66 L152 66 Q160 66 162 74 L166 92" fill="none" stroke="url(#metal)" stroke-width="5" stroke-linecap="round"/>
+<!-- front -->
+<rect x="30" y="104" width="176" height="90" rx="9" fill="url(#front)" stroke="#000" stroke-opacity=".6" stroke-width="1.5"/>
+<rect x="31" y="105" width="174" height="2" rx="1" fill="#fff" opacity=".14"/>
+<rect x="30" y="112" width="176" height="3" fill="#000" opacity=".4"/>
+${ridges}
+<!-- corner guards -->
+<path d="M30 160 L30 185 Q30 194 39 194 L62 194 L62 186 L40 186 Q38 186 38 184 L38 160 Z" fill="url(#metal)" opacity=".85"/>
+<path d="M206 160 L206 185 Q206 194 197 194 L174 194 L174 186 L196 186 Q198 186 198 184 L198 160 Z" fill="url(#metal)" opacity=".85"/>
+<!-- latches -->
+<g><rect x="54" y="100" width="22" height="20" rx="3" fill="url(#metal)"/><rect x="58" y="108" width="14" height="4" rx="2" fill="#2a2f37"/></g>
+<g><rect x="160" y="100" width="22" height="20" rx="3" fill="url(#metal)"/><rect x="164" y="108" width="14" height="4" rx="2" fill="#2a2f37"/></g>
+<!-- accent strip -->
+<rect x="38" y="184" width="160" height="3" rx="1.5" fill="url(#acc)"/>
+<!-- emblem badge -->
+<g transform="translate(118 150)">
+<circle r="30" fill="${accent}" opacity=".18"/>
+<circle r="25" fill="url(#badge)" stroke="${accent}" stroke-opacity=".9" stroke-width="2"/>
+<circle r="25" fill="none" stroke="#fff" stroke-opacity=".08" stroke-width="6"/>
 ${emblem}
+</g>
 </svg>`;
 }
 
@@ -220,12 +300,12 @@ for (const col of CATALOG) {
   writeFileSync(path.join(OUT, "cases", `${col.caseSlug}.svg`), caseSvg(col.caseSlug, col.accent));
   for (const s of col.skins) {
     const slug = slugify(`${s.weapon}-${s.name}`);
-    writeFileSync(path.join(OUT, "skins", `${slug}.svg`), skinSvg(slug, s.weapon, s.pattern, s.colors));
+    writeFileSync(path.join(OUT, "skins", `${slug}.svg`), skinSvg(slug, s.model, s.pattern, s.colors));
     count++;
   }
 }
 // Generic placeholder for admin-created skins without an image yet.
-writeFileSync(path.join(OUT, "skins", "placeholder.svg"), skinSvg("placeholder", "rifle", "carbon", ["#9aa4b2", "#3a404b", "#16191e"]));
+writeFileSync(path.join(OUT, "skins", "placeholder.svg"), skinSvg("placeholder", "ak47", "carbon", ["#9aa4b2", "#3a404b", "#16191e"]));
 writeFileSync(path.join(OUT, "cases", "placeholder.svg"), caseSvg("starter", "#9aa4b2"));
 
 writeFileSync(

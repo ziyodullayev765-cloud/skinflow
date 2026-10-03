@@ -25,12 +25,12 @@ export interface UserRow {
 }
 
 export const userColumns: Column<UserRow>[] = [
-  { key: "user", header: "User", render: (u) => <div className="flex items-center gap-3"><Avatar src={u.avatar_url} name={u.first_name} size={32} /><div className="min-w-0"><p className="truncate font-medium">{u.first_name}</p><p className="truncate text-xs text-muted">{u.username ? `@${u.username}` : u.is_guest ? "guest" : `tg ${u.telegram_id}`}</p></div></div> },
-  { key: "coins", header: "Virtual coins", render: (u) => <span className="inline-flex items-center gap-1 tabular-nums"><CoinIcon size={12} />{fmt(u.virtual_coins)}</span> },
-  { key: "level", header: "Level", render: (u) => u.level },
-  { key: "openings", header: "Openings", render: (u) => fmt(u.openings), hideOnMobile: true },
-  { key: "seen", header: "Last seen", render: (u) => <span className="text-xs text-muted">{u.last_seen_date ? shortDate(u.last_seen_date) : "—"}</span>, hideOnMobile: true },
-  { key: "status", header: "Status", render: (u) => <StatusPill active={!u.blocked} on="Active" off="Blocked" /> },
+  { key: "user", header: "Foydalanuvchi", render: (u) => <div className="flex items-center gap-3"><Avatar src={u.avatar_url} name={u.first_name} size={32} /><div className="min-w-0"><p className="truncate font-medium">{u.first_name}</p><p className="truncate text-xs text-muted">{u.username ? `@${u.username}` : u.is_guest ? "mehmon" : `tg ${u.telegram_id}`}</p></div></div> },
+  { key: "coins", header: "Virtual tangalar", render: (u) => <span className="inline-flex items-center gap-1 tabular-nums"><CoinIcon size={12} />{fmt(u.virtual_coins)}</span> },
+  { key: "level", header: "Daraja", render: (u) => u.level },
+  { key: "openings", header: "Ochilishlar", render: (u) => fmt(u.openings), hideOnMobile: true },
+  { key: "seen", header: "Oxirgi kirish", render: (u) => <span className="text-xs text-muted">{u.last_seen_date ? shortDate(u.last_seen_date) : "—"}</span>, hideOnMobile: true },
+  { key: "status", header: "Holat", render: (u) => <StatusPill active={!u.blocked} on="Faol" off="Bloklangan" /> },
 ];
 
 export function useUserList(search: string, page: number) {
@@ -50,22 +50,22 @@ export default function Users() {
   const q = useUserList(search, page);
   return (
     <>
-      <PageHeader title="Users" subtitle="Players, balances (virtual only) and activity." />
+      <PageHeader title="Foydalanuvchilar" subtitle="O'yinchilar, balanslar (faqat virtual) va faollik." />
       <DataTable
         columns={userColumns}
         rows={q.data?.rows}
         loading={q.isLoading}
-        error={q.isError ? "Couldn't load users." : null}
+        error={q.isError ? "Foydalanuvchilarni yuklab bo'lmadi." : null}
         onRetry={() => void q.refetch()}
         rowKey={(u) => u.id}
         onRowClick={(u) => setOpen(u.id)}
-        search={{ value: search, onChange: setSearch, placeholder: "Search by name, @username, Telegram ID or user ID…" }}
+        search={{ value: search, onChange: setSearch, placeholder: "Ism, @username, Telegram ID yoki foydalanuvchi ID bo'yicha qidirish…" }}
         page={page}
         total={q.data?.total}
         onPage={setPage}
-        empty="No users found."
+        empty="Foydalanuvchi topilmadi."
       />
-      <Sheet open={open !== null} onClose={() => setOpen(null)} title="User" variant="dialog" maxWidth="40rem">
+      <Sheet open={open !== null} onClose={() => setOpen(null)} title="Foydalanuvchi" variant="dialog" maxWidth="40rem">
         {open !== null && <UserDetail userId={open} canEdit />}
       </Sheet>
     </>

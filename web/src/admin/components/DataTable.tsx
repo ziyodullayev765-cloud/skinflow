@@ -28,7 +28,7 @@ interface Props<T> {
   empty?: string;
 }
 
-export function DataTable<T>({ columns, rows, loading, error, onRetry, rowKey, onRowClick, search, filters, page = 1, pageSize = 20, total, onPage, empty = "Nothing here yet." }: Props<T>) {
+export function DataTable<T>({ columns, rows, loading, error, onRetry, rowKey, onRowClick, search, filters, page = 1, pageSize = 20, total, onPage, empty = "Hozircha hech narsa yo'q." }: Props<T>) {
   const pages = total !== undefined ? Math.max(1, Math.ceil(total / pageSize)) : 1;
   return (
     <div className="card overflow-hidden">
@@ -36,9 +36,9 @@ export function DataTable<T>({ columns, rows, loading, error, onRetry, rowKey, o
         <div className="flex flex-wrap items-center gap-2 border-b hairline p-3">
           {search && (
             <label className="relative min-w-[200px] flex-1">
-              <span className="sr-only">Search</span>
+              <span className="sr-only">Qidirish</span>
               <Icon name="search" size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-              <input className="input pl-9" value={search.value} onChange={(e) => search.onChange(e.target.value)} placeholder={search.placeholder ?? "Search…"} type="search" maxLength={100} />
+              <input className="input pl-9" value={search.value} onChange={(e) => search.onChange(e.target.value)} placeholder={search.placeholder ?? "Qidirish…"} type="search" maxLength={100} />
             </label>
           )}
           {filters}
@@ -72,7 +72,7 @@ export function DataTable<T>({ columns, rows, loading, error, onRetry, rowKey, o
                   <p className="text-sm text-danger">{error}</p>
                   {onRetry && (
                     <button type="button" className="btn btn-secondary mt-3 text-sm" onClick={onRetry}>
-                      <Icon name="refresh" size={16} /> Retry
+                      <Icon name="refresh" size={16} /> Qayta urinish
                     </button>
                   )}
                 </td>
@@ -101,16 +101,16 @@ export function DataTable<T>({ columns, rows, loading, error, onRetry, rowKey, o
       {onPage && total !== undefined && total > pageSize && (
         <div className="flex items-center justify-between gap-3 border-t hairline px-4 py-2.5 text-xs text-muted">
           <span>
-            {(page - 1) * pageSize + 1}–{Math.min(total, page * pageSize)} of {total}
+            {(page - 1) * pageSize + 1}–{Math.min(total, page * pageSize)} / {total}
           </span>
           <div className="flex items-center gap-1">
-            <button type="button" className="grid h-9 w-9 place-items-center rounded-lg hover:bg-white/5 disabled:opacity-40" disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label="Previous page">
+            <button type="button" className="grid h-9 w-9 place-items-center rounded-lg hover:bg-white/5 disabled:opacity-40" disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label="Oldingi sahifa">
               <Icon name="back" size={16} />
             </button>
             <span className="px-2 tabular-nums">
               {page} / {pages}
             </span>
-            <button type="button" className="grid h-9 w-9 place-items-center rounded-lg hover:bg-white/5 disabled:opacity-40" disabled={page >= pages} onClick={() => onPage(page + 1)} aria-label="Next page">
+            <button type="button" className="grid h-9 w-9 place-items-center rounded-lg hover:bg-white/5 disabled:opacity-40" disabled={page >= pages} onClick={() => onPage(page + 1)} aria-label="Keyingi sahifa">
               <Icon name="chevron" size={16} />
             </button>
           </div>

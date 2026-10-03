@@ -141,3 +141,29 @@ export function useSetLanguage() {
     onSuccess: (r) => qc.setQueryData(qk.me, r.user),
   });
 }
+
+export function useSellSkin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ skinId, quantity }: { skinId: number; quantity: number }) =>
+      api.post<{ sold: number; earned: number; remaining: number; balance: number }>(`/api/inventory/${skinId}/sell`, { quantity }),
+    onSuccess: (r, { skinId }) => {
+      setBalance(qc, r.balance);
+      qc.setQueryData<InventoryItem[]>(qk.inventory, (items) =>
+        items?.map((i) => (i.skin.id === skinId ? { ...i, quantity: r.remaining } : i)).filter((i) => i.quantity > 0),
+      );
+      qc.setQueryData<InventoryItem>(qk.item(skinId), (i) => (i ? { ...i, quantity: r.remaining } : i));
+      void qc.invalidateQueries({ queryKey: qk.profile });
+      void qc.invalidateQueries({ queryKey: qk.collections });
+      void qc.invalidateQueries({ queryKey: qk.me });
+    },
+  });
+}
+
+export function useRedeemPromo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (code: string) => api.post<{ reward: number; balance: number }>("/api/promo/redeem", { code }),
+    onSuccess: (r) => setBalance(qc, r.balance),
+  });
+}

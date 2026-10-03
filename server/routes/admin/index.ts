@@ -38,7 +38,8 @@ adminRouter.get("/dashboard", async (_req, res) => {
         (SELECT COALESCE(sum(virtual_coins),0)::bigint FROM users) AS total_coins,
         (SELECT count(*)::int FROM openings) AS total_openings,
         (SELECT count(*)::int FROM openings WHERE created_at >= date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS openings_today,
-        (SELECT COALESCE(sum(quantity),0)::int FROM inventory) AS skins_collected`),
+        (SELECT COALESCE(sum(quantity),0)::int FROM inventory) AS skins_collected,
+        (SELECT COALESCE(sum(quantity),0)::int FROM sales) AS skins_sold`),
     query(`SELECT to_char(d, 'YYYY-MM-DD') AS day, count(u.id)::int AS value
              FROM generate_series((now() AT TIME ZONE 'UTC')::date - 13, (now() AT TIME ZONE 'UTC')::date, '1 day') d
              LEFT JOIN users u ON (u.created_at AT TIME ZONE 'UTC')::date = d
@@ -85,7 +86,7 @@ adminRouter.get("/users/:id", async (req, res) => {
   const id = parse(idParam, req.params.id);
   const user = await queryOne(`SELECT * FROM users WHERE id = $1`, [id]);
   if (!user) throw new ApiError("NOT_FOUND", "User not found");
-  const [inventory, openings, missions, rewards] = await Promise.all([
+  const [inventory, openings, missions, rewards, sales] = await Promise.all([
     query(`SELECT i.id AS inv_id, i.quantity, i.favorite, i.acquired_at, ${SKIN_COLUMNS}
              FROM inventory i JOIN skins s ON s.id = i.skin_id WHERE i.user_id = $1 ORDER BY s.virtual_price DESC`, [id]),
     query(`SELECT o.id, o.created_at, o.cost, c.name AS case_name, s.name AS skin_name, s.weapon_name, s.rarity
@@ -94,6 +95,8 @@ adminRouter.get("/users/:id", async (req, res) => {
     query(`SELECT um.period_key, um.progress, um.completed_at, um.claimed_at, m.title, m.target, m.reward, m.period
              FROM user_missions um JOIN missions m ON m.id = um.mission_id WHERE um.user_id = $1 ORDER BY um.updated_at DESC LIMIT 50`, [id]),
     query(`SELECT claim_date, amount, created_at FROM daily_rewards WHERE user_id = $1 ORDER BY claim_date DESC LIMIT 30`, [id]),
+    query(`SELECT sa.id, sa.quantity, sa.total, sa.created_at, s.name AS skin_name, s.weapon_name, s.rarity
+             FROM sales sa JOIN skins s ON s.id = sa.skin_id WHERE sa.user_id = $1 ORDER BY sa.id DESC LIMIT 50`, [id]),
   ]);
   res.json({
     user,
@@ -101,6 +104,7 @@ adminRouter.get("/users/:id", async (req, res) => {
     openings,
     missions,
     rewards,
+    sales,
   });
 });
 
@@ -244,6 +248,22 @@ adminRouter.get("/skins", async (req, res) => {
   res.json({ rows: rows.map((r) => ({ ...serializeSkin(r), owners: r.owners })), total: rows[0]?.total_count ?? 0, page: p.page, pageSize: p.pageSize });
 });
 
+/** Distinct weapon names with skin counts (for the bulk rename tool). */
+adminRouter.get("/weapon-names", async (_req, res) => {
+  res.json({
+    rows: await query(`SELECT weapon_name AS name, weapon_type AS type, count(*)::int AS skins FROM skins GROUP BY weapon_name, weapon_type ORDER BY weapon_type, weapon_name`),
+  });
+});
+
+/** Renames a weapon across every skin that uses it. */
+adminRouter.put("/weapon-names", requireRole("admin"), async (req, res) => {
+  const b = parse(z.object({ from: z.string().trim().min(1).max(60), to: safeText(1, 60) }), req.body);
+  const rows = await query(`UPDATE skins SET weapon_name = $2, updated_at = now() WHERE weapon_name = $1 RETURNING id`, [b.from, b.to]);
+  if (!rows.length) throw new ApiError("NOT_FOUND", "No skins use that weapon name");
+  await auditLog(req, "weapon.rename", "weapon", undefined, { ...b, skins: rows.length });
+  res.json({ updated: rows.length });
+});
+
 adminRouter.get("/skins/:id", async (req, res) => {
   const skin = await loadSkin(parse(idParam, req.params.id));
   if (!skin) throw new ApiError("NOT_FOUND", "Skin not found");
@@ -325,7 +345,8 @@ adminRouter.post("/skins/:id/duplicate", requireRole("admin"), async (req, res) 
 adminRouter.delete("/skins/:id", requireRole("admin"), async (req, res) => {
   const id = parse(idParam, req.params.id);
   const refs = await queryOne<{ owners: number; openings: number }>(
-    `SELECT (SELECT count(*)::int FROM inventory WHERE skin_id = $1) AS owners, (SELECT count(*)::int FROM openings WHERE skin_id = $1) AS openings`,
+    `SELECT (SELECT count(*)::int FROM inventory WHERE skin_id = $1 AND quantity > 0) AS owners,
+            (SELECT count(*)::int FROM openings WHERE skin_id = $1) + (SELECT count(*)::int FROM sales WHERE skin_id = $1) AS openings`,
     [id],
   );
   if (refs && (refs.owners > 0 || refs.openings > 0)) {
@@ -550,6 +571,56 @@ adminRouter.delete("/missions/:id", requireRole("admin"), async (req, res) => {
   const row = await queryOne(`UPDATE missions SET active = FALSE, updated_at = now() WHERE id = $1 RETURNING id`, [id]);
   if (!row) throw new ApiError("NOT_FOUND", "Mission not found");
   await auditLog(req, "mission.deactivate", "mission", id);
+  res.json({ ok: true });
+});
+
+// ------------------------------------------------------------------ Promo codes
+const promoBody = z.object({
+  code: z.string().trim().toUpperCase().regex(/^[A-Z0-9_-]{3,32}$/, "3–32 letters, digits, - or _"),
+  reward: z.number().int().positive().max(1_000_000),
+  maxUses: z.number().int().positive().max(10_000_000).nullable().default(null),
+  expiresAt: z.string().datetime({ offset: true }).nullable().default(null),
+  active: z.boolean().default(true),
+  note: safeText(0, 200).default(""),
+});
+
+const serializePromo = (p: any) => ({
+  id: p.id, code: p.code, reward: p.reward, maxUses: p.max_uses, uses: p.uses, expiresAt: p.expires_at, active: p.active, note: p.note, createdAt: p.created_at,
+});
+
+adminRouter.get("/promo-codes", async (_req, res) => {
+  res.json({ rows: (await query(`SELECT * FROM promo_codes ORDER BY id DESC`)).map(serializePromo) });
+});
+
+adminRouter.post("/promo-codes", requireRole("admin"), async (req, res) => {
+  const b = parse(promoBody, req.body);
+  if (await queryOne(`SELECT 1 FROM promo_codes WHERE code = $1`, [b.code])) throw new ApiError("CONFLICT", "This code already exists");
+  const row = await queryOne(
+    `INSERT INTO promo_codes (code, reward, max_uses, expires_at, active, note) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+    [b.code, b.reward, b.maxUses, b.expiresAt, b.active, b.note],
+  );
+  await auditLog(req, "promo.create", "promo", row.id, { code: b.code, reward: b.reward, maxUses: b.maxUses });
+  res.status(201).json({ promo: serializePromo(row) });
+});
+
+adminRouter.put("/promo-codes/:id", requireRole("admin"), async (req, res) => {
+  const id = parse(idParam, req.params.id);
+  const b = parse(promoBody, req.body);
+  if (await queryOne(`SELECT 1 FROM promo_codes WHERE code = $1 AND id <> $2`, [b.code, id])) throw new ApiError("CONFLICT", "This code already exists");
+  const row = await queryOne(
+    `UPDATE promo_codes SET code=$2, reward=$3, max_uses=$4, expires_at=$5, active=$6, note=$7 WHERE id=$1 RETURNING *`,
+    [id, b.code, b.reward, b.maxUses, b.expiresAt, b.active, b.note],
+  );
+  if (!row) throw new ApiError("NOT_FOUND", "Promo code not found");
+  await auditLog(req, "promo.update", "promo", id, { code: b.code, reward: b.reward, active: b.active });
+  res.json({ promo: serializePromo(row) });
+});
+
+adminRouter.delete("/promo-codes/:id", requireRole("admin"), async (req, res) => {
+  const id = parse(idParam, req.params.id);
+  const row = await queryOne(`DELETE FROM promo_codes WHERE id = $1 RETURNING code`, [id]);
+  if (!row) throw new ApiError("NOT_FOUND", "Promo code not found");
+  await auditLog(req, "promo.delete", "promo", id, { code: row.code });
   res.json({ ok: true });
 });
 

@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMe } from "../lib/queries";
-import { supportsBackButton } from "../lib/telegram";
 import { Icon } from "./Icon";
 import { CoinAmount, Skeleton } from "./ui";
 
@@ -17,15 +16,15 @@ export function BalancePill() {
   );
 }
 
-export function TopBar({ title, subtitle, back, right, className }: { title?: ReactNode; subtitle?: ReactNode; back?: boolean; right?: ReactNode; className?: string }) {
+export function TopBar({ title, subtitle, back, onBack, right, className }: { title?: ReactNode; subtitle?: ReactNode; back?: boolean; onBack?: () => void; right?: ReactNode; className?: string }) {
   const navigate = useNavigate();
-  const showBack = back && !supportsBackButton();
+  const showBack = !!back;
   return (
     <header className={clsx("sticky top-0 z-30 safe-top", className)}>
       <div className="glass border-b hairline">
         <div className="mx-auto flex h-14 max-w-xl items-center gap-2 px-4 lg:max-w-5xl">
           {showBack && (
-            <button type="button" onClick={() => navigate(-1)} className="-ml-2 grid h-11 w-11 place-items-center rounded-full text-muted hover:text-fg" aria-label="Back">
+            <button type="button" onClick={() => (onBack ? onBack() : window.history.length > 1 ? navigate(-1) : navigate("/"))} className="-ml-2 grid h-11 w-11 place-items-center rounded-full text-muted hover:text-fg" aria-label="Back">
               <Icon name="back" size={22} />
             </button>
           )}

@@ -8,6 +8,7 @@ import { useT, type I18nKey } from "../lib/i18n";
 import { useMissions } from "../lib/queries";
 import type { Mission } from "../lib/types";
 import { DailyReward } from "../components/DailyReward";
+import { PromoCard } from "../components/PromoCard";
 
 export default function Missions() {
   const t = useT();
@@ -26,6 +27,7 @@ export default function Missions() {
       <TopBar title={t("missions.title")} subtitle={t("missions.subtitle")} />
       <Page className="space-y-6">
         <DailyReward />
+        <PromoCard />
         {missions.isLoading ? (
           <div className="space-y-2.5">
             {Array.from({ length: 5 }).map((_, i) => (

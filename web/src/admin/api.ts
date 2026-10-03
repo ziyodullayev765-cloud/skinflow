@@ -22,7 +22,7 @@ async function handle<T>(res: Response): Promise<T> {
     const e = data?.error;
     const code = (e?.code ?? (res.status >= 500 ? "SERVER" : "VALIDATION")) as ApiErrorCode;
     if (res.status === 401 && onUnauthorized) onUnauthorized();
-    throw new ApiError(code, e?.message ?? `Request failed (${res.status})`, res.status, e?.details, e?.retryAfter);
+    throw new ApiError(code, e?.message ?? `So'rov bajarilmadi (${res.status})`, res.status, e?.details, e?.retryAfter);
   }
   return data as T;
 }
@@ -41,7 +41,7 @@ export async function adminRequest<T>(path: string, method = "GET", body?: unkno
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
-    throw new ApiError("NETWORK", "Network error — check your connection.");
+    throw new ApiError("NETWORK", "Tarmoq xatosi — internetni tekshiring.");
   }
   return handle<T>(res);
 }
@@ -56,7 +56,7 @@ export async function uploadImage(file: File): Promise<UploadResult> {
       body: file,
     });
   } catch {
-    throw new ApiError("NETWORK", "Network error — check your connection.");
+    throw new ApiError("NETWORK", "Tarmoq xatosi — internetni tekshiring.");
   }
   return (await handle<{ upload: UploadResult }>(res)).upload;
 }

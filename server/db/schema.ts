@@ -94,6 +94,40 @@ CREATE TABLE IF NOT EXISTS openings (
 CREATE INDEX IF NOT EXISTS openings_user_idx ON openings(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS openings_created_idx ON openings(created_at DESC);
 
+-- Skins sold back for VIRTUAL coins only (in-app, non-withdrawable).
+CREATE TABLE IF NOT EXISTS sales (
+  id          SERIAL PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  skin_id     INTEGER NOT NULL REFERENCES skins(id) ON DELETE CASCADE,
+  quantity    INTEGER NOT NULL CHECK (quantity > 0),
+  unit_price  INTEGER NOT NULL CHECK (unit_price >= 0),
+  total       INTEGER NOT NULL CHECK (total >= 0),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS sales_user_idx ON sales(user_id, created_at DESC);
+
+-- Promo codes grant VIRTUAL coins only. Each user can redeem a code once.
+CREATE TABLE IF NOT EXISTS promo_codes (
+  id          SERIAL PRIMARY KEY,
+  code        TEXT UNIQUE NOT NULL,
+  reward      INTEGER NOT NULL CHECK (reward > 0),
+  max_uses    INTEGER CHECK (max_uses IS NULL OR max_uses > 0),
+  uses        INTEGER NOT NULL DEFAULT 0,
+  expires_at  TIMESTAMPTZ,
+  active      BOOLEAN NOT NULL DEFAULT TRUE,
+  note        TEXT NOT NULL DEFAULT '',
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS promo_redemptions (
+  id         SERIAL PRIMARY KEY,
+  promo_id   INTEGER NOT NULL REFERENCES promo_codes(id) ON DELETE CASCADE,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  reward     INTEGER NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (promo_id, user_id)
+);
+
 CREATE TABLE IF NOT EXISTS missions (
   id          SERIAL PRIMARY KEY,
   code        TEXT UNIQUE NOT NULL,

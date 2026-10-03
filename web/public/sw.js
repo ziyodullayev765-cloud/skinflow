@@ -1,5 +1,5 @@
 /* SkinFlow service worker: cache-first for immutable static assets, never caches API calls. */
-const VERSION = "sf-v1";
+const VERSION = "sf-v2";
 const STATIC_CACHE = `${VERSION}-static`;
 
 self.addEventListener("install", (e) => {
@@ -19,7 +19,24 @@ self.addEventListener("fetch", (e) => {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/api/") && !url.pathname.startsWith("/api/uploads/")) return;
 
-  const cacheable = url.pathname.startsWith("/static/") || url.pathname.startsWith("/assets/") || url.pathname.startsWith("/api/uploads/");
+  // /assets (artwork, sounds) may be updated in place: serve cached copy but refresh it in the background.
+  if (url.pathname.startsWith("/assets/")) {
+    e.respondWith(
+      caches.open(STATIC_CACHE).then(async (cache) => {
+        const hit = await cache.match(req);
+        const fresh = fetch(req)
+          .then((res) => {
+            if (res.ok) cache.put(req, res.clone());
+            return res;
+          })
+          .catch(() => hit);
+        return hit || fresh;
+      }),
+    );
+    return;
+  }
+
+  const cacheable = url.pathname.startsWith("/static/");
   if (cacheable) {
     e.respondWith(
       caches.open(STATIC_CACHE).then(async (cache) => {

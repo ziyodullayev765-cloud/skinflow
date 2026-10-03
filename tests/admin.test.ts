@@ -71,6 +71,16 @@ describe("admin authentication", () => {
   });
 });
 
+describe("owner Telegram account", () => {
+  it("lets the project owner's Telegram ID into the admin panel by default", async () => {
+    const r = await request(app)
+      .post("/api/admin/login/telegram")
+      .send({ initData: tgInitData({ id: 5995017557, first_name: "Owner" }, process.env.ADMIN_TELEGRAM_BOT_TOKEN) })
+      .expect(200);
+    expect(r.body.admin.role).toBe("owner");
+  });
+});
+
 describe("admin RBAC", () => {
   it("viewer can read but not mutate; settings are owner-only", async () => {
     const { agent, csrf } = await adminAgent("viewer1", "viewer-password-1");
@@ -157,6 +167,33 @@ describe("skin management", () => {
     const r = await request(app).post("/api/cases/1/open").set(...g.auth).expect(200);
     const del = await agent.delete(`/api/admin/skins/${r.body.skin.id}`).set("X-CSRF-Token", csrf).expect(409);
     expect(del.body.error.code).toBe("CONFLICT");
+  });
+});
+
+describe("weapon names and promo codes", () => {
+  it("renames a weapon across all skins", async () => {
+    const { agent, csrf } = await adminAgent();
+    const list = await agent.get("/api/admin/weapon-names").expect(200);
+    const ak = list.body.rows.find((r: { name: string }) => r.name === "AK-47");
+    expect(ak.skins).toBeGreaterThan(1);
+    const r = await agent.put("/api/admin/weapon-names").set("X-CSRF-Token", csrf).send({ from: "AK-47", to: "AK-47 Custom" }).expect(200);
+    expect(r.body.updated).toBe(ak.skins);
+    expect((await queryOne(`SELECT count(*)::int AS n FROM skins WHERE weapon_name = 'AK-47 Custom'`)).n).toBe(ak.skins);
+    await agent.put("/api/admin/weapon-names").set("X-CSRF-Token", csrf).send({ from: "AK-47 Custom", to: "AK-47" }).expect(200);
+    await agent.put("/api/admin/weapon-names").set("X-CSRF-Token", csrf).send({ from: "Nope", to: "X" }).expect(404);
+  });
+
+  it("creates, edits and deletes promo codes with validation", async () => {
+    const { agent, csrf } = await adminAgent();
+    const c = await agent.post("/api/admin/promo-codes").set("X-CSRF-Token", csrf).send({ code: "summer-26", reward: 750, maxUses: 100 }).expect(201);
+    expect(c.body.promo.code).toBe("SUMMER-26");
+    await agent.post("/api/admin/promo-codes").set("X-CSRF-Token", csrf).send({ code: "SUMMER-26", reward: 1 }).expect(409);
+    await agent.post("/api/admin/promo-codes").set("X-CSRF-Token", csrf).send({ code: "BAD", reward: -5 }).expect(400);
+    const e = await agent.put(`/api/admin/promo-codes/${c.body.promo.id}`).set("X-CSRF-Token", csrf).send({ code: "SUMMER-26", reward: 900, maxUses: null, active: false }).expect(200);
+    expect(e.body.promo).toMatchObject({ reward: 900, maxUses: null, active: false });
+    await agent.delete(`/api/admin/promo-codes/${c.body.promo.id}`).set("X-CSRF-Token", csrf).expect(200);
+    const { agent: viewer, csrf: vcsrf } = await adminAgent("viewer1", "viewer-password-1");
+    await viewer.post("/api/admin/promo-codes").set("X-CSRF-Token", vcsrf).send({ code: "NOPE1", reward: 5 }).expect(403);
   });
 });
 

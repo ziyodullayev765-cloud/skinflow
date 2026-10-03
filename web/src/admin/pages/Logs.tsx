@@ -24,22 +24,22 @@ export default function Logs() {
   const data = useQuery({ queryKey: ["admin", "logs", q, page], queryFn: () => adminApi.get<Paged<Log>>(`/logs?page=${page}&pageSize=30&q=${encodeURIComponent(q)}`), placeholderData: (p) => p });
   return (
     <>
-      <PageHeader title="Audit logs" subtitle="Every admin action is recorded." />
+      <PageHeader title="Audit loglari" subtitle="Har bir admin amali yozib boriladi." />
       <DataTable
         columns={[
-          { key: "at", header: "Time", render: (l) => <span className="whitespace-nowrap text-xs text-muted">{new Date(l.created_at).toLocaleString()}</span> },
+          { key: "at", header: "Vaqt", render: (l) => <span className="whitespace-nowrap text-xs text-muted">{new Date(l.created_at).toLocaleString()}</span> },
           { key: "admin", header: "Admin", render: (l) => l.username ?? <span className="text-muted">—</span> },
-          { key: "action", header: "Action", render: (l) => <code className={`rounded bg-surface2 px-1.5 py-0.5 text-xs ${l.action.includes("failed") ? "text-danger" : ""}`}>{l.action}</code> },
-          { key: "entity", header: "Entity", render: (l) => <span className="text-muted">{l.entity ? `${l.entity}${l.entity_id ? ` #${l.entity_id}` : ""}` : "—"}</span>, hideOnMobile: true },
-          { key: "details", header: "Details", render: (l) => <span className="line-clamp-1 max-w-[320px] font-mono text-[11px] text-muted">{JSON.stringify(l.details)}</span>, hideOnMobile: true },
+          { key: "action", header: "Amal", render: (l) => <code className={`rounded bg-surface2 px-1.5 py-0.5 text-xs ${l.action.includes("failed") ? "text-danger" : ""}`}>{l.action}</code> },
+          { key: "entity", header: "Obyekt", render: (l) => <span className="text-muted">{l.entity ? `${l.entity}${l.entity_id ? ` #${l.entity_id}` : ""}` : "—"}</span>, hideOnMobile: true },
+          { key: "details", header: "Tafsilotlar", render: (l) => <span className="line-clamp-1 max-w-[320px] font-mono text-[11px] text-muted">{JSON.stringify(l.details)}</span>, hideOnMobile: true },
           { key: "ip", header: "IP", render: (l) => <span className="text-xs text-muted">{l.ip}</span>, hideOnMobile: true },
         ]}
         rows={data.data?.rows}
         loading={data.isLoading}
-        error={data.isError ? "Couldn't load logs." : null}
+        error={data.isError ? "Loglarni yuklab bo'lmadi." : null}
         onRetry={() => void data.refetch()}
         rowKey={(l) => l.id}
-        search={{ value: search, onChange: setSearch, placeholder: "Filter by action, entity or admin…" }}
+        search={{ value: search, onChange: setSearch, placeholder: "Amal, obyekt yoki admin bo'yicha filtr…" }}
         page={page}
         pageSize={30}
         total={data.data?.total}

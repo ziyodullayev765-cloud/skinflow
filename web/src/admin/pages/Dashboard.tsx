@@ -4,7 +4,7 @@ import { RARITY_HEX } from "../../lib/rarity";
 import type { Rarity } from "../../lib/types";
 import { adminApi } from "../api";
 import { BarList, Donut, LineChart } from "../components/Charts";
-import { Notice, PageHeader, StatCard } from "../components/kit";
+import { Notice, PageHeader, RARITY_UZ, StatCard } from "../components/kit";
 import { Skeleton } from "../../components/ui";
 
 interface DashboardData {
@@ -40,37 +40,37 @@ export default function Dashboard() {
   const loading = q.isLoading;
   return (
     <>
-      <PageHeader title="Dashboard" subtitle="Live overview of the virtual collection game." />
+      <PageHeader title="Boshqaruv paneli" subtitle="Virtual kolleksiya o'yinining jonli ko'rinishi." />
       {q.isError && (
         <div className="mb-4">
-          <Notice tone="error">Couldn't load statistics. <button className="underline" onClick={() => void q.refetch()}>Retry</button></Notice>
+          <Notice tone="error">Statistikani yuklab bo'lmadi. <button className="underline" onClick={() => void q.refetch()}>Qayta urinish</button></Notice>
         </div>
       )}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatCard loading={loading} label="Total users" value={fmt(t?.total_users ?? 0)} icon="users" />
-        <StatCard loading={loading} label="Active users (7d)" value={fmt(t?.active_users ?? 0)} icon="bolt" tone="accent2" />
-        <StatCard loading={loading} label="Daily active" value={fmt(t?.daily_active_users ?? 0)} icon="flame" tone="success" />
-        <StatCard loading={loading} label="New users today" value={fmt(t?.new_users_today ?? 0)} icon="plus" />
-        <StatCard loading={loading} label="Virtual coins in circulation" value={fmt(t?.total_coins ?? 0)} icon="coin" tone="coin" />
-        <StatCard loading={loading} label="Total case openings" value={fmt(t?.total_openings ?? 0)} icon="cases" tone="accent2" />
-        <StatCard loading={loading} label="Openings today" value={fmt(t?.openings_today ?? 0)} icon="history" tone="success" />
-        <StatCard loading={loading} label="Skins collected" value={fmt(t?.skins_collected ?? 0)} icon="skins" />
+        <StatCard loading={loading} label="Jami foydalanuvchilar" value={fmt(t?.total_users ?? 0)} icon="users" />
+        <StatCard loading={loading} label="Faol foydalanuvchilar (7 kun)" value={fmt(t?.active_users ?? 0)} icon="bolt" tone="accent2" />
+        <StatCard loading={loading} label="Bugun faol" value={fmt(t?.daily_active_users ?? 0)} icon="flame" tone="success" />
+        <StatCard loading={loading} label="Bugun yangi" value={fmt(t?.new_users_today ?? 0)} icon="plus" />
+        <StatCard loading={loading} label="Aylanmadagi virtual tangalar" value={fmt(t?.total_coins ?? 0)} icon="coin" tone="coin" />
+        <StatCard loading={loading} label="Jami ochilgan keyslar" value={fmt(t?.total_openings ?? 0)} icon="cases" tone="accent2" />
+        <StatCard loading={loading} label="Bugun ochilgan" value={fmt(t?.openings_today ?? 0)} icon="history" tone="success" />
+        <StatCard loading={loading} label="Yig'ilgan skinlar" value={fmt(t?.skins_collected ?? 0)} icon="skins" />
       </div>
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <ChartCard title="Users per day" loading={loading}>
+        <ChartCard title="Kunlik foydalanuvchilar" loading={loading}>
           <LineChart data={q.data?.usersPerDay ?? []} />
         </ChartCard>
-        <ChartCard title="Openings per day" loading={loading}>
+        <ChartCard title="Kunlik ochilishlar" loading={loading}>
           <LineChart data={q.data?.openingsPerDay ?? []} color="rgb(var(--accent-2))" />
         </ChartCard>
-        <ChartCard title="Most opened cases" loading={loading}>
+        <ChartCard title="Eng ko'p ochilgan keyslar" loading={loading}>
           <BarList data={q.data?.topCases ?? []} />
         </ChartCard>
-        <ChartCard title="Most collected skins" loading={loading}>
+        <ChartCard title="Eng ko'p yig'ilgan skinlar" loading={loading}>
           <BarList data={q.data?.topSkins ?? []} colorFor={(d) => RARITY_HEX[(d.rarity as Rarity) ?? "common"]} />
         </ChartCard>
-        <ChartCard title="Rarity distribution (all drops)" loading={loading}>
-          <Donut data={(["common", "uncommon", "rare", "epic", "legendary"] as Rarity[]).map((r) => ({ label: r, value: q.data?.rarity.find((x) => x.label === r)?.value ?? 0, color: RARITY_HEX[r] }))} />
+        <ChartCard title="Noyoblik taqsimoti (barcha tushumlar)" loading={loading}>
+          <Donut data={(["common", "uncommon", "rare", "epic", "legendary"] as Rarity[]).map((r) => ({ label: RARITY_UZ[r], value: q.data?.rarity.find((x) => x.label === r)?.value ?? 0, color: RARITY_HEX[r] }))} />
         </ChartCard>
       </div>
     </>
