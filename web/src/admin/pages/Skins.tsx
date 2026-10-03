@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Icon } from "../../components/Icon";
 import { Sheet } from "../../components/Sheet";
 import { CoinIcon, Spinner } from "../../components/ui";
@@ -177,6 +177,7 @@ function SkinForm({ editing, collections, onSaved }: { editing: AdminSkin | null
   const [uploadErr, setUploadErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     setErrors({});
@@ -205,6 +206,11 @@ function SkinForm({ editing, collections, onSaved }: { editing: AdminSkin | null
   const set = (p: Partial<FormState>) => setF((s) => ({ ...s, ...p }));
   const collectionName = collections.find((c) => String(c.id) === f.collectionId)?.name;
 
+  // Clear the "not saved" message as soon as the admin edits the form again.
+  useEffect(() => {
+    setServerErr(null);
+  }, [f.name, f.weaponType, f.rarity, f.virtualPrice, f.description, f.collectionId, f.newCollection, f.uploadId]);
+
   const onFile = async (file: File) => {
     const local = URL.createObjectURL(file);
     set({ preview: local, uploadId: null });
@@ -227,7 +233,17 @@ function SkinForm({ editing, collections, onSaved }: { editing: AdminSkin | null
     e.preventDefault();
     const v = validateSkinForm(f, !editing);
     setErrors(v);
-    if (Object.values(v).some(Boolean)) return;
+    const firstError = Object.entries(v).find(([, msg]) => msg);
+    if (firstError) {
+      // Make the problem visible: banner at the top + scroll to the field.
+      setServerErr(`Saqlanmadi: ${firstError[1]}`);
+      requestAnimationFrame(() => {
+        const el = formRef.current?.querySelector<HTMLElement>(`[data-field="${firstError[0]}"]`);
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+        el?.querySelector<HTMLElement>("input, select, textarea")?.focus({ preventScroll: true });
+      });
+      return;
+    }
     setSaving(true);
     setServerErr(null);
     const body = {
@@ -267,17 +283,17 @@ function SkinForm({ editing, collections, onSaved }: { editing: AdminSkin | null
   if (success && !editing) return <SuccessCheck label="Skin yaratildi" />;
 
   return (
-    <form onSubmit={submit} className="grid gap-5 pt-1 md:grid-cols-[1fr_260px]" noValidate>
+    <form ref={formRef} onSubmit={submit} className="grid gap-5 pt-1 md:grid-cols-[1fr_260px]" noValidate>
       <div className="space-y-4">
         {serverErr && <Notice tone="error">{serverErr}</Notice>}
-        <Field label="Skin rasmi" error={errors.image}>
+        <Field field="image" label="Skin rasmi" error={errors.image}>
           <ImageDrop preview={f.preview} onFile={onFile} uploading={uploading} error={uploadErr} />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Skin nomi *" error={errors.name}>
+          <Field field="name" label="Skin nomi *" error={errors.name}>
             <Input value={f.name} onChange={(e) => set({ name: e.target.value })} placeholder="Carbon Pulse" maxLength={60} />
           </Field>
-          <Field label="Qurol turi *" error={errors.weaponType}>
+          <Field field="weaponType" label="Qurol turi *" error={errors.weaponType}>
             <Select value={f.weaponType} onChange={(e) => set({ weaponType: e.target.value })}>
               <option value="">Tanlang…</option>
               {WEAPONS.map((w) => (
@@ -295,7 +311,7 @@ function SkinForm({ editing, collections, onSaved }: { editing: AdminSkin | null
               ))}
             </datalist>
           </Field>
-          <Field label="Noyoblik *" error={errors.rarity}>
+          <Field field="rarity" label="Noyoblik *" error={errors.rarity}>
             <Select value={f.rarity} onChange={(e) => set({ rarity: e.target.value as Rarity })}>
               <option value="">Tanlang…</option>
               {RARITIES.map((r) => (
@@ -305,13 +321,13 @@ function SkinForm({ editing, collections, onSaved }: { editing: AdminSkin | null
               ))}
             </Select>
           </Field>
-          <Field label="Virtual narx (tanga) *" error={errors.virtualPrice} hint="Faqat ilova ichidagi virtual qiymat — haqiqiy pul emas">
+          <Field field="virtualPrice" label="Virtual narx (tanga) *" error={errors.virtualPrice} hint="Faqat ilova ichidagi virtual qiymat — haqiqiy pul emas">
             <div className="relative">
               <CoinIcon size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" />
               <Input type="number" inputMode="numeric" min={1} max={MAX_VIRTUAL_PRICE} step={1} value={f.virtualPrice} onChange={(e) => set({ virtualPrice: e.target.value })} placeholder="1000" className="pl-10" />
             </div>
           </Field>
-          <Field label="Kolleksiya" error={errors.newCollection}>
+          <Field field="newCollection" label="Kolleksiya" error={errors.newCollection}>
             <Select value={f.collectionId} onChange={(e) => set({ collectionId: e.target.value })}>
               <option value="">Kolleksiyasiz</option>
               {collections.map((c) => (
@@ -324,7 +340,7 @@ function SkinForm({ editing, collections, onSaved }: { editing: AdminSkin | null
             {f.collectionId === "__new" && <Input className="mt-2" value={f.newCollection} onChange={(e) => set({ newCollection: e.target.value })} placeholder="Yangi kolleksiya nomi" maxLength={60} autoFocus />}
           </Field>
         </div>
-        <Field label={`Tavsif (${f.description.length}/500)`} error={errors.description}>
+        <Field field="description" label={`Tavsif (${f.description.length}/500)`} error={errors.description}>
           <Textarea value={f.description} onChange={(e) => set({ description: e.target.value })} maxLength={500} placeholder="Skin haqida qisqacha tavsif." />
         </Field>
         <div className="flex flex-wrap gap-6">
@@ -345,6 +361,7 @@ function SkinForm({ editing, collections, onSaved }: { editing: AdminSkin | null
           {saving ? <Spinner /> : editing ? "O'zgarishlarni saqlash" : "Skin yaratish"}
         </button>
         {success && editing && <p className="mt-2 text-center text-xs text-success">Saqlandi ✓</p>}
+        {serverErr && <p className="mt-2 text-center text-xs text-danger" role="alert">{serverErr}</p>}
       </div>
     </form>
   );

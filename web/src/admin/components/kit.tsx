@@ -18,9 +18,9 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
   );
 }
 
-export function Field({ label, error, hint, children, className }: { label: string; error?: string; hint?: string; children: ReactNode; className?: string }) {
+export function Field({ label, error, hint, children, className, field }: { label: string; error?: string; hint?: string; children: ReactNode; className?: string; field?: string }) {
   return (
-    <label className={clsx("block", className)}>
+    <label className={clsx("block", className)} data-field={field}>
       <span className="mb-1.5 block text-xs font-medium text-muted">{label}</span>
       {children}
       {error ? <span className="mt-1 block text-xs text-danger">{error}</span> : hint ? <span className="mt-1 block text-xs text-muted/80">{hint}</span> : null}
