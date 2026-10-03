@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { ApiError, api, setAuthToken, setUnauthorizedHandler } from "../lib/api";
 import { initData, isTelegram } from "../lib/telegram";
+import { reloadIfOutdated } from "../lib/version";
 import type { AppConfig, Me } from "../lib/types";
 import { safeStorage } from "./settings";
 
@@ -38,6 +39,7 @@ export const useSession = create<SessionState>((set, get) => ({
       if (get().status === "ready") set({ status: "error", error: new ApiError("INVALID_SESSION", "Session expired", 401) });
     });
     const config = await fetchConfig();
+    if (reloadIfOutdated(config?.build)) return;
     set({ config });
     try {
       // 1) Inside Telegram: always exchange fresh signed initData for a server token.

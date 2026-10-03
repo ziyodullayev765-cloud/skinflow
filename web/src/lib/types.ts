@@ -152,4 +152,5 @@ export interface AppConfig {
   guestLogin: boolean;
   telegramLogin: boolean;
   botUsername: string | null;
+  build: string | null;
 }

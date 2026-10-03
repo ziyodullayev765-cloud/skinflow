@@ -1,5 +1,5 @@
 /* SkinFlow service worker: cache-first for immutable static assets, never caches API calls. */
-const VERSION = "sf-v2";
+const VERSION = "sf-v3";
 const STATIC_CACHE = `${VERSION}-static`;
 
 self.addEventListener("install", (e) => {

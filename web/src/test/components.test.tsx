@@ -133,3 +133,12 @@ describe("i18n", () => {
     expect(translate("uz", "daily.claim", { amount: 250 })).toBe("250 olish");
   });
 });
+
+import { reloadIfOutdated } from "../lib/version";
+describe("auto update", () => {
+  it("never reloads for dev builds or a matching/missing server build", () => {
+    expect(reloadIfOutdated(null)).toBe(false);
+    expect(reloadIfOutdated(undefined)).toBe(false);
+    expect(reloadIfOutdated("abc")).toBe(false); // test build id is a dev id
+  });
+});

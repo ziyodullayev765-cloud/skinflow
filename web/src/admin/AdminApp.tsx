@@ -7,6 +7,7 @@ import { Icon, type IconName } from "../components/Icon";
 import { Skeleton, Spinner } from "../components/ui";
 import { ApiError } from "../lib/api";
 import { initData, isTelegram } from "../lib/telegram";
+import { checkForUpdate } from "../lib/version";
 import { adminApi, setAdminUnauthorized, setCsrf } from "./api";
 import { Field, Input, Notice, ROLE_UZ } from "./components/kit";
 
@@ -282,6 +283,7 @@ function AdminRoot() {
   });
 
   useEffect(() => {
+    void checkForUpdate();
     document.documentElement.dataset.theme = "dark";
     document.title = "SkinFlow Admin";
     try {

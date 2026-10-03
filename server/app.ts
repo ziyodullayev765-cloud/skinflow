@@ -56,6 +56,7 @@ export function createApp() {
       guestLogin: config.allowGuestLogin,
       telegramLogin: !!config.telegramBotToken,
       botUsername: (s as unknown as Record<string, unknown>).telegram_bot_username ?? null,
+      build: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
     });
   });
 

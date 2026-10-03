@@ -1,8 +1,12 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+// Same commit SHA is used by the server (VERCEL_GIT_COMMIT_SHA) so clients can detect new deploys.
+const BUILD_ID = process.env.VERCEL_GIT_COMMIT_SHA || `dev-${Date.now()}`;
+
 export default defineConfig({
   root: "web",
+  define: { __BUILD_ID__: JSON.stringify(BUILD_ID) },
   publicDir: "public",
   plugins: [react()],
   build: {
