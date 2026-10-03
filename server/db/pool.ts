@@ -8,10 +8,18 @@ pg.types.setTypeParser(1700, (v) => Number(v));
 
 let pool: pg.Pool | null = null;
 
+/**
+ * pg currently treats sslmode=require/prefer/verify-ca as verify-full and logs a
+ * warning on every cold start. Make that explicit (same behaviour, no warning).
+ */
+export function normalizeConnectionString(url: string): string {
+  return url.replace(/([?&]sslmode=)(require|prefer|verify-ca)(?=&|$)/i, "$1verify-full");
+}
+
 export function getPool(): pg.Pool {
   if (!pool) {
     pool = new pg.Pool({
-      connectionString: config.databaseUrl,
+      connectionString: normalizeConnectionString(config.databaseUrl),
       ssl: config.databaseSsl ? { rejectUnauthorized: false } : undefined,
       max: process.env.VERCEL ? 3 : 10,
       idleTimeoutMillis: 10_000,

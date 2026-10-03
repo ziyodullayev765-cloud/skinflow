@@ -38,3 +38,12 @@ describe("Telegram initData validation", () => {
     expect(validateInitData("x", "")).toEqual({ ok: false, reason: "no_token" });
   });
 });
+
+import { normalizeConnectionString } from "../server/db/pool.js";
+describe("database URL normalisation", () => {
+  it("makes Neon's sslmode explicit without touching other params", () => {
+    expect(normalizeConnectionString("postgres://u:p@h/db?sslmode=require&channel_binding=require")).toBe("postgres://u:p@h/db?sslmode=verify-full&channel_binding=require");
+    expect(normalizeConnectionString("postgres://u:p@h/db?channel_binding=require&sslmode=prefer")).toBe("postgres://u:p@h/db?channel_binding=require&sslmode=verify-full");
+    expect(normalizeConnectionString("postgres://u:p@localhost/db")).toBe("postgres://u:p@localhost/db");
+  });
+});
