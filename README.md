@@ -68,7 +68,7 @@ npm run assets                # regenerate the original placeholder artwork & so
 ## Deploying to Vercel
 
 1. Import the repo in Vercel (framework: *Other*; `vercel.json` already configures build, output, rewrites and headers).
-2. Storage: add a **Postgres** database (e.g. Neon from the Vercel Marketplace → sets `DATABASE_URL`/`POSTGRES_URL`) and a **Blob** store (sets `BLOB_READ_WRITE_TOKEN`).
+2. Storage: add a **Postgres** database (e.g. Neon from the Vercel Marketplace → sets `DATABASE_URL`/`POSTGRES_URL`) and a **Blob** store (sets `BLOB_STORE_ID`, or `BLOB_READ_WRITE_TOKEN` for older stores).
 3. Environment variables:
 
 | Variable | Purpose |
@@ -80,7 +80,7 @@ npm run assets                # regenerate the original placeholder artwork & so
 | `ADMIN_TELEGRAM_IDS` | Extra Telegram user IDs allowed into the admin panel (the owner ID in `server/config.ts` is always allowed) |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | First owner account (created once) |
 | `ALLOW_GUEST_LOGIN` | `true` to let browser visitors try the app without Telegram |
-| `BLOB_READ_WRITE_TOKEN` | Vercel Blob (image storage) |
+| `BLOB_STORE_ID` / `BLOB_READ_WRITE_TOKEN` | Vercel Blob image storage (set automatically when the store is connected) |
 | `PUBLIC_URL` | Optional canonical URL used for bot buttons/webhooks |
 
 4. Open `https://<your-app>/admin` → **Settings → Telegram bots → Connect bots to this deployment**. This sets both bots' webhooks, menu buttons (`Play` / `Admin`) and `/start` commands.

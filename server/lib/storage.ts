@@ -5,13 +5,14 @@ import { ApiError } from "./errors.js";
 /**
  * Object storage for uploaded images. Files never go into PostgreSQL —
  * only their public URLs do.
- *  - Vercel Blob (CDN-backed) when BLOB_READ_WRITE_TOKEN is set (production)
+ *  - Vercel Blob (CDN-backed) when BLOB_STORE_ID (OIDC, current Vercel default)
+ *    or BLOB_READ_WRITE_TOKEN (legacy token) is set
  *  - Local disk served at /api/files/* for development / self-hosting
  */
 export const LOCAL_UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR || "uploads");
 
 export function storageDriver(): "blob" | "local" | "none" {
-  if (process.env.BLOB_READ_WRITE_TOKEN) return "blob";
+  if (process.env.BLOB_STORE_ID || process.env.BLOB_READ_WRITE_TOKEN) return "blob";
   if (process.env.VERCEL) return "none"; // read-only, ephemeral filesystem
   return "local";
 }
@@ -36,5 +37,5 @@ export async function putObject(key: string, body: Buffer, contentType: string):
     await writeFile(file, body, { flag: "wx" });
     return `/api/files/${key}`;
   }
-  throw new ApiError("SERVER", "Image storage is not configured. Connect a Vercel Blob store (BLOB_READ_WRITE_TOKEN).");
+  throw new ApiError("SERVER", "Image storage is not configured. Connect a Vercel Blob store to the project (BLOB_STORE_ID) and redeploy.");
 }
