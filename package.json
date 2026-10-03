@@ -1,0 +1,61 @@
+{
+  "name": "skinflow",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SkinFlow — a virtual CS2-inspired skin collection Telegram Mini App. Entertainment only: no real money, no cash-out.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c cyan,magenta \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "tsx watch server/index.ts",
+    "dev:web": "vite",
+    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "start": "NODE_ENV=production tsx server/index.ts",
+    "assets": "tsx scripts/generate-assets.ts",
+    "db:migrate": "tsx server/db/cli.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@vercel/blob": "^2.8.0",
+    "cookie-parser": "^1.4.7",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "pg": "^8.16.0",
+    "sharp": "^0.35.5",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@tanstack/react-query": "^5.83.0",
+    "@tanstack/react-virtual": "^3.13.12",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@types/cookie-parser": "^1.4.9",
+    "@types/express": "^5.0.3",
+    "@types/node": "^22.16.0",
+    "@types/pg": "^8.15.4",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@types/supertest": "^6.0.3",
+    "@vitejs/plugin-react": "^4.7.0",
+    "autoprefixer": "^10.4.21",
+    "clsx": "^2.1.1",
+    "concurrently": "^9.2.0",
+    "framer-motion": "^12.23.0",
+    "jsdom": "^26.1.0",
+    "postcss": "^8.5.6",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.7.0",
+    "supertest": "^7.1.3",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^3.2.4",
+    "zustand": "^5.0.6"
+  }
+}
