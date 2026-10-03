@@ -121,7 +121,7 @@ describe("skin management", () => {
     expect(paths).toEqual(expect.arrayContaining(["name", "virtualPrice"]));
     const noImg = await agent.post("/api/admin/skins").set("X-CSRF-Token", csrf).send({ name: "No Image", weaponType: "rifle", rarity: "rare", virtualPrice: 10 }).expect(400);
     expect(noImg.body.error.details[0].path).toBe("uploadId");
-    await agent.post("/api/admin/skins").set("X-CSRF-Token", csrf).send({ name: "Too pricey", weaponType: "rifle", rarity: "rare", virtualPrice: 10_000_001, uploadId: up.id }).expect(400);
+    await agent.post("/api/admin/skins").set("X-CSRF-Token", csrf).send({ name: "Too pricey", weaponType: "rifle", rarity: "rare", virtualPrice: 1_000_000_001, uploadId: up.id }).expect(400);
     await agent.post("/api/admin/skins").set("X-CSRF-Token", csrf).send({ name: "Float", weaponType: "rifle", rarity: "rare", virtualPrice: 10.5, uploadId: up.id }).expect(400);
     await agent.post("/api/admin/skins").set("X-CSRF-Token", csrf).send({ name: "Long", weaponType: "rifle", rarity: "rare", virtualPrice: 10, uploadId: up.id, description: "x".repeat(501) }).expect(400);
     await agent.post("/api/admin/skins").set("X-CSRF-Token", csrf).send({ name: "Url inject", weaponType: "rifle", rarity: "rare", virtualPrice: 10, imageUrl: "javascript:alert(1)" }).expect(400);
@@ -159,6 +159,40 @@ describe("skin management", () => {
 
     const logs = await queryOne(`SELECT count(*)::int AS n FROM admin_logs WHERE action LIKE 'skin.%'`);
     expect(logs.n).toBeGreaterThanOrEqual(5);
+  });
+
+  it("accepts prices up to 1,000,000,000 and BIGINT balances never overflow", async () => {
+    const { agent, csrf } = await adminAgent();
+    const up = (await upload(agent, csrf)).body.upload;
+    const created = await agent
+      .post("/api/admin/skins")
+      .set("X-CSRF-Token", csrf)
+      .send({ name: "Billion", weaponType: "knife", rarity: "legendary", virtualPrice: 1_000_000_000, uploadId: up.id })
+      .expect(201);
+    expect(created.body.skin.virtualPrice).toBe(1_000_000_000);
+    const g = await guest();
+    await query(`INSERT INTO inventory (user_id, skin_id, quantity) VALUES ($1, $2, 3)`, [g.userId, created.body.skin.id]);
+    const sold = await request(app).post(`/api/inventory/${created.body.skin.id}/sell`).set(...g.auth).send({ quantity: 3 }).expect(200);
+    expect(sold.body.earned).toBe(3_000_000_000);
+    expect(sold.body.balance).toBeGreaterThan(3_000_000_000);
+    const me = await request(app).get("/api/me").set(...g.auth).expect(200);
+    expect(me.body.user.coins).toBe(sold.body.balance);
+    await agent.post(`/api/admin/users/${g.userId}/coins`).set("X-CSRF-Token", csrf).send({ delta: 1_000_000_000, reason: "test limit" }).expect(200);
+    await agent.post(`/api/admin/users/${g.userId}/coins`).set("X-CSRF-Token", csrf).send({ delta: 1_000_000_001, reason: "too much" }).expect(400);
+    await agent.post("/api/admin/promo-codes").set("X-CSRF-Token", csrf).send({ code: "BILLION", reward: 1_000_000_000 }).expect(201);
+  });
+
+  it("upgrades legacy INTEGER coin columns to BIGINT on startup", async () => {
+    await query(`ALTER TABLE users ALTER COLUMN virtual_coins TYPE INTEGER USING LEAST(virtual_coins, 2000000000)::int`);
+    await query(`ALTER TABLE skins DROP CONSTRAINT skins_virtual_price_check`);
+    await query(`UPDATE skins SET virtual_price = LEAST(virtual_price, 10000000)`);
+    await query(`ALTER TABLE skins ADD CONSTRAINT skins_virtual_price_check CHECK (virtual_price > 0 AND virtual_price <= 10000000)`);
+    const { schemaSql } = await import("../server/db/schema.js");
+    await query(schemaSql);
+    const col = await queryOne(`SELECT data_type FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'virtual_coins'`);
+    expect(col.data_type).toBe("bigint");
+    const chk = await queryOne(`SELECT pg_get_constraintdef(oid) AS d FROM pg_constraint WHERE conname = 'skins_virtual_price_check'`);
+    expect(chk.d).toContain("1000000000");
   });
 
   it("refuses to hard-delete skins that players own", async () => {

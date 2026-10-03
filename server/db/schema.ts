@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
   last_name     TEXT,
   avatar_url    TEXT,
   language      TEXT NOT NULL DEFAULT 'en',
-  virtual_coins INTEGER NOT NULL DEFAULT 0 CHECK (virtual_coins >= 0),
+  virtual_coins BIGINT NOT NULL DEFAULT 0 CHECK (virtual_coins >= 0),
   xp            INTEGER NOT NULL DEFAULT 0,
   level         INTEGER NOT NULL DEFAULT 1,
   streak_days   INTEGER NOT NULL DEFAULT 0,
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS skins (
   optimized_image_url TEXT,
   thumbnail_url       TEXT,
   description         TEXT NOT NULL DEFAULT '',
-  virtual_price       INTEGER NOT NULL DEFAULT 1 CHECK (virtual_price > 0 AND virtual_price <= 10000000),
+  virtual_price       BIGINT NOT NULL DEFAULT 1 CONSTRAINT skins_virtual_price_check CHECK (virtual_price > 0 AND virtual_price <= 1000000000),
   collection_id       INTEGER REFERENCES collections(id) ON DELETE SET NULL,
   active              BOOLEAN NOT NULL DEFAULT TRUE,
   featured            BOOLEAN NOT NULL DEFAULT FALSE,
@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS cases (
   description TEXT NOT NULL DEFAULT '',
   image       TEXT NOT NULL,
   accent      TEXT NOT NULL DEFAULT '#7c8cff',
-  cost        INTEGER NOT NULL CHECK (cost >= 0),
+  cost        BIGINT NOT NULL CHECK (cost >= 0),
   featured    BOOLEAN NOT NULL DEFAULT FALSE,
   sort_order  INTEGER NOT NULL DEFAULT 0,
   active      BOOLEAN NOT NULL DEFAULT TRUE,
@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS openings (
   user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   case_id    INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
   skin_id    INTEGER NOT NULL REFERENCES skins(id) ON DELETE CASCADE,
-  cost       INTEGER NOT NULL DEFAULT 0,
+  cost       BIGINT NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS openings_user_idx ON openings(user_id, created_at DESC);
@@ -100,8 +100,8 @@ CREATE TABLE IF NOT EXISTS sales (
   user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   skin_id     INTEGER NOT NULL REFERENCES skins(id) ON DELETE CASCADE,
   quantity    INTEGER NOT NULL CHECK (quantity > 0),
-  unit_price  INTEGER NOT NULL CHECK (unit_price >= 0),
-  total       INTEGER NOT NULL CHECK (total >= 0),
+  unit_price  BIGINT NOT NULL CHECK (unit_price >= 0),
+  total       BIGINT NOT NULL CHECK (total >= 0),
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS sales_user_idx ON sales(user_id, created_at DESC);
@@ -110,7 +110,7 @@ CREATE INDEX IF NOT EXISTS sales_user_idx ON sales(user_id, created_at DESC);
 CREATE TABLE IF NOT EXISTS promo_codes (
   id          SERIAL PRIMARY KEY,
   code        TEXT UNIQUE NOT NULL,
-  reward      INTEGER NOT NULL CHECK (reward > 0),
+  reward      BIGINT NOT NULL CHECK (reward > 0),
   max_uses    INTEGER CHECK (max_uses IS NULL OR max_uses > 0),
   uses        INTEGER NOT NULL DEFAULT 0,
   expires_at  TIMESTAMPTZ,
@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS promo_redemptions (
   id         SERIAL PRIMARY KEY,
   promo_id   INTEGER NOT NULL REFERENCES promo_codes(id) ON DELETE CASCADE,
   user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  reward     INTEGER NOT NULL,
+  reward     BIGINT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (promo_id, user_id)
 );
@@ -135,7 +135,7 @@ CREATE TABLE IF NOT EXISTS missions (
   description TEXT NOT NULL DEFAULT '',
   type        TEXT NOT NULL CHECK (type IN ('open_case','view_skins','claim_daily','complete_profile','login_streak')),
   target      INTEGER NOT NULL DEFAULT 1 CHECK (target > 0),
-  reward      INTEGER NOT NULL DEFAULT 0 CHECK (reward >= 0),
+  reward      BIGINT NOT NULL DEFAULT 0 CHECK (reward >= 0),
   period      TEXT NOT NULL DEFAULT 'daily' CHECK (period IN ('daily','weekly','once')),
   sort_order  INTEGER NOT NULL DEFAULT 0,
   active      BOOLEAN NOT NULL DEFAULT TRUE,
@@ -160,7 +160,7 @@ CREATE TABLE IF NOT EXISTS daily_rewards (
   id         SERIAL PRIMARY KEY,
   user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   claim_date DATE NOT NULL,
-  amount     INTEGER NOT NULL,
+  amount     BIGINT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (user_id, claim_date)
 );
@@ -223,4 +223,25 @@ CREATE TABLE IF NOT EXISTS uploads (
   created_by    INTEGER REFERENCES admin_users(id) ON DELETE SET NULL,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Upgrade existing databases: coin amounts are BIGINT (up to 1,000,000,000 per item / reward).
+DO $$
+DECLARE r record;
+BEGIN
+  FOR r IN SELECT * FROM (VALUES
+    ('users','virtual_coins'), ('skins','virtual_price'), ('cases','cost'), ('openings','cost'),
+    ('sales','unit_price'), ('sales','total'), ('promo_codes','reward'), ('promo_redemptions','reward'),
+    ('missions','reward'), ('daily_rewards','amount')) AS t(tbl, col)
+  LOOP
+    IF EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema = current_schema() AND table_name = r.tbl AND column_name = r.col AND data_type = 'integer') THEN
+      EXECUTE format('ALTER TABLE %I ALTER COLUMN %I TYPE BIGINT', r.tbl, r.col);
+    END IF;
+  END LOOP;
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'skins_virtual_price_check'
+             AND pg_get_constraintdef(oid) NOT LIKE '%1000000000%') THEN
+    ALTER TABLE skins DROP CONSTRAINT skins_virtual_price_check;
+    ALTER TABLE skins ADD CONSTRAINT skins_virtual_price_check CHECK (virtual_price > 0 AND virtual_price <= 1000000000);
+  END IF;
+END $$;
 `;

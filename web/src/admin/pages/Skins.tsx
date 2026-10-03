@@ -16,7 +16,7 @@ import { DataTable, type Column } from "../components/DataTable";
 import { ImageDrop } from "../components/ImageDrop";
 import { Field, IconButton, Input, Notice, PageHeader, RARITY_UZ, RarityPill, Segmented, Select, StatusPill, SuccessCheck, Textarea } from "../components/kit";
 
-export const MAX_VIRTUAL_PRICE = 1_000_000;
+export const MAX_VIRTUAL_PRICE = 1_000_000_000;
 
 /** Suggested CS2 weapon names per type (admins can type anything). */
 const WEAPON_SUGGESTIONS: Record<string, string[]> = {

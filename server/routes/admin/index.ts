@@ -8,6 +8,7 @@ import { probabilities, weightedPick } from "../../lib/random.js";
 import { idParam, imageRef, safeText } from "../../lib/sanitize.js";
 import { parse } from "../../lib/validate.js";
 import { hashPassword } from "../../lib/password.js";
+import { MAX_COINS } from "../../lib/limits.js";
 import { auditLog, requireAdmin, requireRole } from "../../middleware/adminAuth.js";
 import { RARITY_RANK, SKIN_COLUMNS, serializeSkin, type SkinRow } from "../../services/serialize.js";
 import { getSettings, invalidateSettings } from "../../services/settings.js";
@@ -110,7 +111,7 @@ adminRouter.get("/users/:id", async (req, res) => {
 
 adminRouter.post("/users/:id/coins", requireRole("admin"), async (req, res) => {
   const id = parse(idParam, req.params.id);
-  const body = parse(z.object({ delta: z.number().int().min(-1_000_000).max(1_000_000).refine((v) => v !== 0), reason: safeText(3, 200) }), req.body);
+  const body = parse(z.object({ delta: z.number().int().min(-MAX_COINS).max(MAX_COINS).refine((v) => v !== 0), reason: safeText(3, 200) }), req.body);
   const row = await queryOne(
     `UPDATE users SET virtual_coins = GREATEST(0, virtual_coins + $2), updated_at = now() WHERE id = $1 RETURNING virtual_coins`,
     [id, body.delta],
@@ -155,7 +156,7 @@ const WEAPONS = ["rifle", "smg", "pistol", "sniper", "shotgun", "knife", "gloves
 const WEAPON_DEFAULT_NAME: Record<(typeof WEAPONS)[number], string> = {
   rifle: "Rifle", smg: "SMG", pistol: "Pistol", sniper: "Sniper", shotgun: "Shotgun", knife: "Knife", gloves: "Gloves",
 };
-export const MAX_VIRTUAL_PRICE = 1_000_000;
+export const MAX_VIRTUAL_PRICE = MAX_COINS;
 
 /**
  * Images are referenced by the id returned from POST /uploads — the client
@@ -364,7 +365,7 @@ const caseBody = z.object({
   description: safeText(0, 300),
   image: imageRef,
   accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
-  cost: z.number().int().min(0).max(1_000_000),
+  cost: z.number().int().min(0).max(MAX_COINS),
   featured: z.boolean().default(false),
   sortOrder: z.number().int().min(0).max(10000).default(0),
   active: z.boolean().default(true),
@@ -520,7 +521,7 @@ const missionBody = z.object({
   description: safeText(0, 300),
   type: z.enum(["open_case", "view_skins", "claim_daily", "complete_profile", "login_streak"]),
   target: z.number().int().min(1).max(1000),
-  reward: z.number().int().min(0).max(100_000),
+  reward: z.number().int().min(0).max(MAX_COINS),
   period: z.enum(["daily", "weekly", "once"]),
   sortOrder: z.number().int().min(0).max(10000).default(0),
   active: z.boolean().default(true),
@@ -577,7 +578,7 @@ adminRouter.delete("/missions/:id", requireRole("admin"), async (req, res) => {
 // ------------------------------------------------------------------ Promo codes
 const promoBody = z.object({
   code: z.string().trim().toUpperCase().regex(/^[A-Z0-9_-]{3,32}$/, "3–32 letters, digits, - or _"),
-  reward: z.number().int().positive().max(1_000_000),
+  reward: z.number().int().positive().max(MAX_COINS),
   maxUses: z.number().int().positive().max(10_000_000).nullable().default(null),
   expiresAt: z.string().datetime({ offset: true }).nullable().default(null),
   active: z.boolean().default(true),
@@ -654,10 +655,10 @@ const settingsBody = z.object({
   app_name: safeText(2, 40),
   maintenance_mode: z.boolean(),
   animation_intensity: z.enum(["low", "normal", "high"]),
-  daily_reward_amount: z.number().int().min(0).max(100_000),
+  daily_reward_amount: z.number().int().min(0).max(MAX_COINS),
   cases_enabled: z.boolean(),
   min_app_version: z.string().regex(/^\d+\.\d+\.\d+$/),
-  starting_coins: z.number().int().min(0).max(1_000_000),
+  starting_coins: z.number().int().min(0).max(MAX_COINS),
   open_cooldown_seconds: z.number().int().min(0).max(3600),
 });
 

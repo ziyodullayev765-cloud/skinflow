@@ -121,7 +121,7 @@ describe("admin skin form validation", () => {
   it("flags missing image, bad price and missing fields", () => {
     const e = validateSkinForm({ ...ok, name: "", weaponType: "", rarity: "", virtualPrice: "-3", uploadId: null }, true);
     expect(Object.keys(e)).toEqual(expect.arrayContaining(["name", "weaponType", "rarity", "virtualPrice", "image"]));
-    expect(validateSkinForm({ ...ok, virtualPrice: "2000000" }, true).virtualPrice).toMatch(/Maksimal/);
+    expect(validateSkinForm({ ...ok, virtualPrice: "2000000000" }, true).virtualPrice).toMatch(/Maksimal/);
     expect(validateSkinForm({ ...ok, virtualPrice: "1.5" }, true).virtualPrice).toBeTruthy();
     expect(validateSkinForm({ ...ok, uploadId: null }, false).image).toBeUndefined();
   });
