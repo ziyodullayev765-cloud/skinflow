@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { Router } from "express";
 import { config } from "../config.js";
-import { queryOne } from "../db/pool.js";
+import { query, queryOne } from "../db/pool.js";
 import { botApi, botToken, webhookSecret, type BotKind } from "../lib/telegramBot.js";
 
 export const telegramRouter = Router();
@@ -86,4 +86,42 @@ export async function setupBots(origin: string) {
     }
   }
   return results;
+}
+
+let autoSetupPromise: Promise<void> | null = null;
+
+/**
+ * After each new deploy, points both bots' menu buttons and webhooks at the
+ * production URL — automatically, exactly once (claimed via a DB compare-and-set).
+ * Prevents Telegram from opening an old, frozen per-deployment URL.
+ */
+export function autoSetupBotsOnce(): Promise<void> {
+  const build = process.env.VERCEL_GIT_COMMIT_SHA;
+  if (!build || !config.publicUrl || (!config.telegramBotToken && !config.adminTelegramBotToken)) return Promise.resolve();
+  if (!autoSetupPromise) {
+    autoSetupPromise = (async () => {
+      await query(`INSERT INTO settings (key, value) VALUES ('telegram_setup_build', '""'::jsonb) ON CONFLICT (key) DO NOTHING`);
+      const claimed = await query(
+        `UPDATE settings SET value = $1::jsonb, updated_at = now()
+          WHERE key = 'telegram_setup_build' AND value IS DISTINCT FROM $1::jsonb RETURNING key`,
+        [JSON.stringify(build)],
+      );
+      if (!claimed.length) return; // another instance already did it for this deploy
+      try {
+        const results = await setupBots(config.publicUrl);
+        const appBot = results.app as { username?: string } | undefined;
+        if (appBot?.username) {
+          await query(
+            `INSERT INTO settings (key, value) VALUES ('telegram_bot_username', $1::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+            [JSON.stringify(appBot.username)],
+          );
+        }
+        console.log("[telegram] bots synced to", config.publicUrl, JSON.stringify(results));
+      } catch (err) {
+        await query(`UPDATE settings SET value = '""'::jsonb WHERE key = 'telegram_setup_build'`).catch(() => undefined);
+        throw err;
+      }
+    })().catch((err) => console.error("[telegram] auto setup failed", (err as Error).message));
+  }
+  return autoSetupPromise;
 }

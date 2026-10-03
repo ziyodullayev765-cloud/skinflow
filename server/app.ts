@@ -10,7 +10,7 @@ import { Readable } from "node:stream";
 import { adminRouter } from "./routes/admin/index.js";
 import { authRouter } from "./routes/auth.js";
 import { userRouter } from "./routes/user.js";
-import { telegramRouter } from "./routes/telegram.js";
+import { autoSetupBotsOnce, telegramRouter } from "./routes/telegram.js";
 import { getSettings } from "./services/settings.js";
 
 export function createApp() {
@@ -40,6 +40,8 @@ export function createApp() {
   // Lazily migrate on first request (serverless cold start friendly).
   app.use("/api", async (_req, _res, next) => {
     await ensureDatabase();
+    // Once per deploy: re-point the Telegram bots at the production URL (bounded wait).
+    await Promise.race([autoSetupBotsOnce(), new Promise((r) => setTimeout(r, 4000))]);
     next();
   });
 

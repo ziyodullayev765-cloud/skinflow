@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { config } from "../config.js";
 import { hashPassword } from "../lib/password.js";
 import { getPool, query, queryOne, withTransaction } from "./pool.js";
@@ -102,17 +103,43 @@ export function resetMigrationState(): void {
   migrationPromise = null;
 }
 
-/** Creates schema + seed data once per process (memoised, safe for serverless cold starts). */
+/** Identifies the schema + seed logic; bump-free (derived from the SQL itself). */
+const SCHEMA_VERSION = createHash("sha256").update(schemaSql).update("seed:v3").digest("hex").slice(0, 16);
+
+async function storedSchemaVersion(): Promise<string | null> {
+  try {
+    const r = await queryOne<{ value: string }>(`SELECT value #>> '{}' AS value FROM settings WHERE key = 'schema_version'`);
+    return r?.value ?? null;
+  } catch {
+    return null; // settings table doesn't exist yet
+  }
+}
+
+/**
+ * Creates schema + seed data once per process (memoised, safe for serverless cold starts).
+ *
+ * - Skips all DDL when the stored schema version matches (fast cold starts, no locks).
+ * - Uses a TRANSACTION-scoped advisory lock: session locks break behind Neon's
+ *   pgbouncer (transaction pooling) and could stay held forever, hanging every request.
+ * - lock_timeout/statement_timeout make a stuck migration fail fast instead of
+ *   blocking requests until the function times out.
+ */
 export function ensureDatabase(): Promise<void> {
   if (!migrationPromise) {
     migrationPromise = (async () => {
-      // Advisory lock so concurrent cold starts don't race on DDL.
+      if ((await storedSchemaVersion()) === SCHEMA_VERSION) return;
       const client = await getPool().connect();
       try {
-        await client.query("SELECT pg_advisory_lock(727274)");
+        await client.query("BEGIN");
+        await client.query("SET LOCAL lock_timeout = '10s'");
+        await client.query("SET LOCAL statement_timeout = '25s'");
+        await client.query("SELECT pg_advisory_xact_lock(727275)");
         await client.query(schemaSql);
+        await client.query("COMMIT");
+      } catch (err) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw err;
       } finally {
-        await client.query("SELECT pg_advisory_unlock(727274)").catch(() => undefined);
         client.release();
       }
       await seedSettings();
@@ -120,6 +147,11 @@ export function ensureDatabase(): Promise<void> {
       await syncCatalogWeaponNames();
       await seedMissions();
       await seedAdmin();
+      await query(
+        `INSERT INTO settings (key, value) VALUES ('schema_version', $1::jsonb)
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
+        [JSON.stringify(SCHEMA_VERSION)],
+      );
     })().catch((err) => {
       migrationPromise = null;
       throw err;

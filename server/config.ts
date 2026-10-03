@@ -27,7 +27,11 @@ export const config = {
   adminTelegramIds: [...new Set([...OWNER_TELEGRAM_IDS, ...(process.env.ADMIN_TELEGRAM_IDS || "").split(/[\s,]+/)])]
     .map((v) => v.trim())
     .filter((v) => /^\d{3,20}$/.test(v)),
-  publicUrl: (process.env.PUBLIC_URL || "").replace(/\/+$/, ""),
+  /** Canonical URL for bot buttons/webhooks — the production alias, never a per-deployment URL. */
+  publicUrl: (
+    process.env.PUBLIC_URL ||
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "")
+  ).replace(/\/+$/, ""),
   telegramAuthMaxAge: Number(process.env.TELEGRAM_AUTH_MAX_AGE || 86400),
   sessionSecret,
   userTokenTtlSeconds: 60 * 60 * 24 * 7,

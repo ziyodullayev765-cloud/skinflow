@@ -24,6 +24,9 @@ export function getPool(): pg.Pool {
       max: process.env.VERCEL ? 3 : 10,
       idleTimeoutMillis: 10_000,
       connectionTimeoutMillis: 8_000,
+      // Never let a slow/locked query hang a request until the function times out.
+      statement_timeout: 20_000,
+      query_timeout: 25_000,
     });
     pool.on("error", (err) => console.error("[db] idle client error", err.message));
   }
