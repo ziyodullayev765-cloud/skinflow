@@ -38,6 +38,56 @@ function Section({ title, subtitle, children }: { title: string; subtitle?: stri
   );
 }
 
+interface SystemStatus {
+  db: { ok: boolean; version?: string; error?: string };
+  imageLib: { ok: boolean; version?: string; error?: string };
+  storage: { driver: "blob" | "local" | "none"; access: "public" | "private" | null };
+  env: Record<string, boolean>;
+  runtime: { node: string; vercel: boolean; region: string | null };
+}
+
+function StatusRow({ ok, label, detail }: { ok: boolean; label: string; detail?: string }) {
+  return (
+    <li className="flex items-start gap-2">
+      <Icon name={ok ? "check" : "close"} size={16} className={`mt-0.5 shrink-0 ${ok ? "text-success" : "text-danger"}`} />
+      <span>
+        {label}
+        {detail && <span className="block break-all text-xs text-muted">{detail}</span>}
+      </span>
+    </li>
+  );
+}
+
+function SystemSection() {
+  const q = useQuery({ queryKey: ["admin", "system"], queryFn: () => adminApi.get<SystemStatus>("/system") });
+  const d = q.data;
+  return (
+    <Section title="Tizim holati" subtitle="Baza, rasm ombori va kalitlar to'g'ri ulanganini tekshiradi.">
+      {q.isLoading ? (
+        <Spinner className="text-muted" />
+      ) : q.isError || !d ? (
+        <Notice tone="error">{q.error instanceof ApiError ? q.error.message : "Tekshirib bo'lmadi"}</Notice>
+      ) : (
+        <ul className="space-y-2 text-sm">
+          <StatusRow ok={d.db.ok} label={d.db.ok ? `Ma'lumotlar bazasi ulangan (PostgreSQL ${d.db.version ?? ""})` : "Ma'lumotlar bazasiga ulanib bo'lmadi"} detail={d.db.error} />
+          <StatusRow ok={d.imageLib.ok} label={d.imageLib.ok ? `Rasm optimizatori ishlayapti (sharp ${d.imageLib.version ?? ""})` : "Rasm optimizatori ishlamayapti"} detail={d.imageLib.error} />
+          <StatusRow
+            ok={d.storage.driver !== "none"}
+            label={d.storage.driver === "blob" ? `Rasm ombori: Vercel Blob${d.storage.access ? ` (${d.storage.access === "private" ? "yopiq" : "ochiq"})` : ""}` : d.storage.driver === "local" ? "Rasm ombori: lokal disk" : "Rasm ombori ulanmagan (Vercel → Storage → Blob → loyihaga ulang)"}
+          />
+          {Object.entries(d.env).map(([k, v]) => (
+            <StatusRow key={k} ok={v || k === "BLOB_STORE_ID" || (k === "BLOB_READ_WRITE_TOKEN" && d.env.BLOB_STORE_ID)} label={`${k}: ${v ? "bor" : "yo'q"}`} />
+          ))}
+          <li className="pt-1 text-xs text-muted">Node {d.runtime.node}{d.runtime.vercel ? ` · Vercel${d.runtime.region ? ` (${d.runtime.region})` : ""}` : ""}</li>
+        </ul>
+      )}
+      <button type="button" className="btn btn-secondary mt-4 text-sm" onClick={() => void q.refetch()} disabled={q.isFetching}>
+        {q.isFetching ? <Spinner /> : <Icon name="refresh" size={16} />} Qayta tekshirish
+      </button>
+    </Section>
+  );
+}
+
 function TelegramSection() {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["admin", "telegram"], queryFn: () => adminApi.get<{ appBotConfigured: boolean; adminBotConfigured: boolean; allowedIds: string[]; linked: { id: number; username: string; telegram_id: number }[] }>("/telegram") });
@@ -211,6 +261,7 @@ export default function SettingsPage({ me }: { me: AdminMe }) {
             </form>
           )}
         </Section>
+        <SystemSection />
         {isOwner && <TelegramSection />}
         {isOwner && <AdminsSection />}
         <Section title="Qoidalar">

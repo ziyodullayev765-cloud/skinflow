@@ -706,6 +706,41 @@ adminRouter.post("/admins", requireRole("owner"), async (req, res) => {
   res.status(201).json({ admin: row });
 });
 
+// ------------------------------------------------------------------ System status (diagnostics, no secrets)
+adminRouter.get("/system", async (_req, res) => {
+  const { storageDriver, blobAccessMode } = await import("../../lib/storage.js");
+  let db: { ok: boolean; error?: string; version?: string } = { ok: false };
+  try {
+    const r = await queryOne<{ v: string }>(`SELECT split_part(version(), ' ', 2) AS v`);
+    db = { ok: true, version: r?.v };
+  } catch (e) {
+    db = { ok: false, error: (e as Error).message };
+  }
+  let imageLib: { ok: boolean; version?: string; error?: string };
+  try {
+    const sharp = (await import("sharp")).default;
+    await sharp({ create: { width: 2, height: 2, channels: 3, background: "#000" } }).webp().toBuffer();
+    imageLib = { ok: true, version: sharp.versions?.sharp };
+  } catch (e) {
+    imageLib = { ok: false, error: (e as Error).message };
+  }
+  const has = (k: string) => !!process.env[k];
+  res.json({
+    db,
+    imageLib,
+    storage: { driver: storageDriver(), access: blobAccessMode() },
+    env: {
+      DATABASE_URL: has("DATABASE_URL") || has("POSTGRES_URL"),
+      SESSION_SECRET: has("SESSION_SECRET"),
+      TELEGRAM_BOT_TOKEN: has("TELEGRAM_BOT_TOKEN"),
+      ADMIN_TELEGRAM_BOT_TOKEN: has("ADMIN_TELEGRAM_BOT_TOKEN"),
+      BLOB_READ_WRITE_TOKEN: has("BLOB_READ_WRITE_TOKEN"),
+      BLOB_STORE_ID: has("BLOB_STORE_ID"),
+    },
+    runtime: { node: process.version, vercel: !!process.env.VERCEL, region: process.env.VERCEL_REGION ?? null },
+  });
+});
+
 // ------------------------------------------------------------------ Telegram bots (owner only)
 adminRouter.get("/telegram", requireRole("owner"), async (_req, res) => {
   const linked = await query(`SELECT id, username, telegram_id FROM admin_users WHERE telegram_id IS NOT NULL ORDER BY id`);

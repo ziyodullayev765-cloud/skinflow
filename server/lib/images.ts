@@ -50,17 +50,30 @@ export async function processSkinImage(buf: Buffer, declaredMime: string): Promi
   if (meta.width < 64 || meta.height < 64) throw new ApiError("VALIDATION", "Image is too small (min 64×64)");
 
   const base = sharp(buf, { limitInputPixels: 40_000_000 }).rotate();
-  const [optimized, thumbnail] = await Promise.all([
+  let optimized: Buffer, thumbnail: Buffer;
+  try {
+    [optimized, thumbnail] = await Promise.all([
     base.clone().resize({ width: 1024, height: 1024, fit: "inside", withoutEnlargement: true }).webp({ quality: 84, alphaQuality: 90, effort: 4 }).toBuffer(),
     base.clone().resize({ width: 320, height: 320, fit: "inside", withoutEnlargement: true }).webp({ quality: 76, alphaQuality: 85, effort: 4 }).toBuffer(),
-  ]);
+    ]);
+  } catch (err) {
+    throw new ApiError("SERVER", `Image optimisation failed: ${(err as Error).message}`);
+  }
 
   const id = randomBytes(10).toString("hex");
   const prefix = `skins/${id}`;
-  const [originalUrl, optimizedUrl, thumbnailUrl] = await Promise.all([
-    putObject(`${prefix}/original.${EXT[mime]}`, buf, mime),
-    putObject(`${prefix}/optimized.webp`, optimized, "image/webp"),
-    putObject(`${prefix}/thumb.webp`, thumbnail, "image/webp"),
-  ]);
+  let originalUrl: string, optimizedUrl: string, thumbnailUrl: string;
+  try {
+    // Optimized first so the store's access mode is detected once before the others.
+    optimizedUrl = await putObject(`${prefix}/optimized.webp`, optimized, "image/webp");
+    [originalUrl, thumbnailUrl] = await Promise.all([
+      putObject(`${prefix}/original.${EXT[mime]}`, buf, mime),
+      putObject(`${prefix}/thumb.webp`, thumbnail, "image/webp"),
+    ]);
+  } catch (err) {
+    if (err instanceof ApiError) throw err;
+    console.error("[images] storage upload failed", err);
+    throw new ApiError("SERVER", `Image storage upload failed: ${(err as Error).message}`);
+  }
   return { id, originalUrl, optimizedUrl, thumbnailUrl, mime, size: buf.length, width: meta.width, height: meta.height, hasAlpha: !!meta.hasAlpha };
 }

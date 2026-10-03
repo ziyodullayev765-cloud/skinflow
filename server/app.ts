@@ -5,7 +5,8 @@ import { assertConfig, config } from "./config.js";
 import { ensureDatabase } from "./db/migrate.js";
 import { ApiError } from "./lib/errors.js";
 import { rateLimit } from "./lib/rateLimit.js";
-import { LOCAL_UPLOAD_DIR, storageDriver } from "./lib/storage.js";
+import { getPrivateObject, isSafeKey, LOCAL_UPLOAD_DIR, storageDriver } from "./lib/storage.js";
+import { Readable } from "node:stream";
 import { adminRouter } from "./routes/admin/index.js";
 import { authRouter } from "./routes/auth.js";
 import { userRouter } from "./routes/user.js";
@@ -63,6 +64,18 @@ export function createApp() {
     app.use("/api/files", express.static(LOCAL_UPLOAD_DIR, { immutable: true, maxAge: "1y", index: false, dotfiles: "deny", fallthrough: false }));
   }
 
+  // Private Vercel Blob objects are proxied here (skin art is public content, so no auth).
+  app.get(/^\/api\/media\/(.+)$/, async (req, res) => {
+    const key = decodeURIComponent((req.params as Record<string, string>)[0] ?? "");
+    if (!isSafeKey(key) || !key.startsWith("skins/")) throw new ApiError("NOT_FOUND", "Not found");
+    const obj = await getPrivateObject(key).catch(() => null);
+    if (!obj) throw new ApiError("NOT_FOUND", "Not found");
+    res.setHeader("Content-Type", obj.contentType);
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    res.setHeader("Content-Security-Policy", "default-src 'none'");
+    Readable.fromWeb(obj.stream as unknown as import("node:stream/web").ReadableStream).pipe(res);
+  });
+
   app.use("/api/telegram", telegramRouter);
   app.use("/api/auth", authRouter);
   app.use("/api/admin", adminRouter);
@@ -71,7 +84,7 @@ export function createApp() {
   app.use("/api", (_req, _res, next) => next(new ApiError("NOT_FOUND", "Endpoint not found")));
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
     if (err instanceof ApiError) {
       if (err.retryAfter) res.setHeader("Retry-After", String(err.retryAfter));
       res.status(err.status).json({ error: { code: err.code, message: err.message, details: err.details, retryAfter: err.retryAfter } });
@@ -87,7 +100,9 @@ export function createApp() {
       return;
     }
     console.error("[api] unhandled error", err);
-    res.status(500).json({ error: { code: "SERVER", message: "Something went wrong on our side. Please try again." } });
+    // Signed-in admins get the underlying reason to make production issues diagnosable.
+    const reason = req.admin ? ` (${(err as Error)?.message ?? String(err)})`.slice(0, 400) : "";
+    res.status(500).json({ error: { code: "SERVER", message: `Something went wrong on our side. Please try again.${reason}` } });
   });
 
   return app;

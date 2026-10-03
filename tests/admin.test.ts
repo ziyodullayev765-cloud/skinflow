@@ -223,6 +223,21 @@ describe("case management", () => {
     expect((await queryOne(`SELECT active FROM cases WHERE id = $1`, [id])).active).toBe(false);
   });
 
+  it("reports system status without leaking secrets", async () => {
+    const { agent } = await adminAgent();
+    const r = await agent.get("/api/admin/system").expect(200);
+    expect(r.body.db.ok).toBe(true);
+    expect(r.body.imageLib.ok).toBe(true);
+    expect(r.body.env.SESSION_SECRET).toBe(true);
+    expect(JSON.stringify(r.body)).not.toContain(process.env.SESSION_SECRET!);
+    expect(JSON.stringify(r.body)).not.toContain(process.env.TELEGRAM_BOT_TOKEN!);
+  });
+
+  it("media proxy only serves safe skin keys", async () => {
+    await request(app).get("/api/media/..%2F..%2Fetc%2Fpasswd").expect(404);
+    await request(app).get("/api/media/other/x.png").expect(404);
+  });
+
   it("dashboard, users, openings, logs and settings work for owners", async () => {
     const { agent, csrf } = await adminAgent();
     const d = await agent.get("/api/admin/dashboard").expect(200);

@@ -13,6 +13,6 @@ export const imageRef = z
   .string()
   .trim()
   .max(500)
-  .refine((v) => /^\/(assets|api\/files)\/[A-Za-z0-9._\-/]+$/.test(v) || /^https:\/\/[^\s"'<>]+$/.test(v), "Invalid image URL");
+  .refine((v) => /^\/(assets|api\/files|api\/media)\/[A-Za-z0-9._\-/]+$/.test(v) || /^https:\/\/[^\s"'<>]+$/.test(v), "Invalid image URL");
 
 export const idParam = z.coerce.number().int().positive().max(2_147_483_647);
